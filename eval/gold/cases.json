@@ -1,0 +1,674 @@
+[
+ {
+  "claim": {
+   "id": "C000",
+   "order_id": "ORD0000",
+   "damage_conf": 0.95,
+   "amount_inr": 499,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken",
+   "modalities_agree": false
+  },
+  "expected": "escalate"
+ },
+ {
+  "claim": {
+   "id": "C001",
+   "order_id": "ORD0001",
+   "damage_conf": 0.6,
+   "amount_inr": 2999,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "escalate"
+ },
+ {
+  "claim": {
+   "id": "C002",
+   "order_id": "ORD0002",
+   "damage_conf": 0.95,
+   "amount_inr": 499,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "approve"
+ },
+ {
+  "claim": {
+   "id": "C003",
+   "order_id": "ORD0003",
+   "damage_conf": 0.1,
+   "amount_inr": 499,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "escalate"
+ },
+ {
+  "claim": {
+   "id": "C004",
+   "order_id": "ORD0004",
+   "damage_conf": 0.95,
+   "amount_inr": 2999,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken",
+   "modalities_agree": false
+  },
+  "expected": "escalate"
+ },
+ {
+  "claim": {
+   "id": "C005",
+   "order_id": "ORD0005",
+   "damage_conf": 0.95,
+   "amount_inr": 2999,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "approve"
+ },
+ {
+  "claim": {
+   "id": "C006",
+   "order_id": "ORD0006",
+   "damage_conf": 0.95,
+   "amount_inr": 499,
+   "days_since_delivery": 12,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "reject"
+ },
+ {
+  "claim": {
+   "id": "C007",
+   "order_id": "ORD0007",
+   "damage_conf": 0.95,
+   "amount_inr": 1499,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "approve"
+ },
+ {
+  "claim": {
+   "id": "C008",
+   "order_id": "ORD0008",
+   "damage_conf": 0.6,
+   "amount_inr": 499,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "escalate"
+ },
+ {
+  "claim": {
+   "id": "C009",
+   "order_id": "ORD0009",
+   "damage_conf": 0.95,
+   "amount_inr": 499,
+   "days_since_delivery": 12,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "reject"
+ },
+ {
+  "claim": {
+   "id": "C010",
+   "order_id": "ORD0010",
+   "damage_conf": 0.1,
+   "amount_inr": 1499,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "escalate"
+ },
+ {
+  "claim": {
+   "id": "C011",
+   "order_id": "ORD0011",
+   "damage_conf": 0.95,
+   "amount_inr": 2999,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "approve"
+ },
+ {
+  "claim": {
+   "id": "C012",
+   "order_id": "ORD0012",
+   "damage_conf": 0.95,
+   "amount_inr": 499,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "approve"
+ },
+ {
+  "claim": {
+   "id": "C013",
+   "order_id": "ORD0013",
+   "damage_conf": 0.95,
+   "amount_inr": 2999,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "approve"
+ },
+ {
+  "claim": {
+   "id": "C014",
+   "order_id": "ORD0014",
+   "damage_conf": 0.6,
+   "amount_inr": 499,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "escalate"
+ },
+ {
+  "claim": {
+   "id": "C015",
+   "order_id": "ORD0015",
+   "damage_conf": 0.95,
+   "amount_inr": 499,
+   "days_since_delivery": 12,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "reject"
+ },
+ {
+  "claim": {
+   "id": "C016",
+   "order_id": "ORD0016",
+   "damage_conf": 0.1,
+   "amount_inr": 499,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "escalate"
+ },
+ {
+  "claim": {
+   "id": "C017",
+   "order_id": "ORD0017",
+   "damage_conf": 0.95,
+   "amount_inr": 1499,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken",
+   "duplicate_image": true
+  },
+  "expected": "escalate"
+ },
+ {
+  "claim": {
+   "id": "C018",
+   "order_id": "ORD0018",
+   "damage_conf": 0.95,
+   "amount_inr": 2999,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "approve"
+ },
+ {
+  "claim": {
+   "id": "C019",
+   "order_id": "ORD0019",
+   "damage_conf": 0.95,
+   "amount_inr": 2999,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "approve"
+ },
+ {
+  "claim": {
+   "id": "C020",
+   "order_id": "ORD0020",
+   "damage_conf": 0.95,
+   "amount_inr": 2999,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken",
+   "duplicate_image": true
+  },
+  "expected": "escalate"
+ },
+ {
+  "claim": {
+   "id": "C021",
+   "order_id": "ORD0021",
+   "damage_conf": 0.95,
+   "amount_inr": 499,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "approve"
+ },
+ {
+  "claim": {
+   "id": "C022",
+   "order_id": "ORD0022",
+   "damage_conf": 0.95,
+   "amount_inr": 1499,
+   "days_since_delivery": 12,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "reject"
+ },
+ {
+  "claim": {
+   "id": "C023",
+   "order_id": "ORD0023",
+   "damage_conf": 0.95,
+   "amount_inr": 2999,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "approve"
+ },
+ {
+  "claim": {
+   "id": "C024",
+   "order_id": "ORD0024",
+   "damage_conf": 0.95,
+   "amount_inr": 2999,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "approve"
+ },
+ {
+  "claim": {
+   "id": "C025",
+   "order_id": "ORD0025",
+   "damage_conf": 0.95,
+   "amount_inr": 2999,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "approve"
+ },
+ {
+  "claim": {
+   "id": "C026",
+   "order_id": "ORD0026",
+   "damage_conf": 0.95,
+   "amount_inr": 1499,
+   "days_since_delivery": 12,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "reject"
+ },
+ {
+  "claim": {
+   "id": "C027",
+   "order_id": "ORD0027",
+   "damage_conf": 0.1,
+   "amount_inr": 1499,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "escalate"
+ },
+ {
+  "claim": {
+   "id": "C028",
+   "order_id": "ORD0028",
+   "damage_conf": 0.95,
+   "amount_inr": 1499,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken",
+   "modalities_agree": false
+  },
+  "expected": "escalate"
+ },
+ {
+  "claim": {
+   "id": "C029",
+   "order_id": "BAD29",
+   "damage_conf": 0.95,
+   "amount_inr": 1499,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "reject"
+ },
+ {
+  "claim": {
+   "id": "C030",
+   "order_id": "ORD0030",
+   "damage_conf": 0.95,
+   "amount_inr": 499,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken",
+   "duplicate_image": true
+  },
+  "expected": "escalate"
+ },
+ {
+  "claim": {
+   "id": "C031",
+   "order_id": "ORD0031",
+   "damage_conf": 0.95,
+   "amount_inr": 2999,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "approve"
+ },
+ {
+  "claim": {
+   "id": "C032",
+   "order_id": "ORD0032",
+   "damage_conf": 0.95,
+   "amount_inr": 499,
+   "days_since_delivery": 12,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "reject"
+ },
+ {
+  "claim": {
+   "id": "C033",
+   "order_id": "ORD0033",
+   "damage_conf": 0.95,
+   "amount_inr": 2999,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken",
+   "duplicate_image": true
+  },
+  "expected": "escalate"
+ },
+ {
+  "claim": {
+   "id": "C034",
+   "order_id": "BAD34",
+   "damage_conf": 0.95,
+   "amount_inr": 1499,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "reject"
+ },
+ {
+  "claim": {
+   "id": "C035",
+   "order_id": "BAD35",
+   "damage_conf": 0.95,
+   "amount_inr": 1499,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "reject"
+ },
+ {
+  "claim": {
+   "id": "C036",
+   "order_id": "ORD0036",
+   "damage_conf": 0.95,
+   "amount_inr": 499,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "approve"
+ },
+ {
+  "claim": {
+   "id": "C037",
+   "order_id": "ORD0037",
+   "damage_conf": 0.1,
+   "amount_inr": 1499,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "escalate"
+ },
+ {
+  "claim": {
+   "id": "C038",
+   "order_id": "ORD0038",
+   "damage_conf": 0.95,
+   "amount_inr": 1499,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "approve"
+ },
+ {
+  "claim": {
+   "id": "C039",
+   "order_id": "ORD0039",
+   "damage_conf": 0.95,
+   "amount_inr": 1499,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "approve"
+ },
+ {
+  "claim": {
+   "id": "C040",
+   "order_id": "ORD0040",
+   "damage_conf": 0.6,
+   "amount_inr": 499,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "escalate"
+ },
+ {
+  "claim": {
+   "id": "C041",
+   "order_id": "ORD0041",
+   "damage_conf": 0.95,
+   "amount_inr": 2999,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "approve"
+ },
+ {
+  "claim": {
+   "id": "C042",
+   "order_id": "ORD0042",
+   "damage_conf": 0.95,
+   "amount_inr": 1499,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken",
+   "modalities_agree": false
+  },
+  "expected": "escalate"
+ },
+ {
+  "claim": {
+   "id": "C043",
+   "order_id": "ORD0043",
+   "damage_conf": 0.95,
+   "amount_inr": 2999,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken",
+   "modalities_agree": false
+  },
+  "expected": "escalate"
+ },
+ {
+  "claim": {
+   "id": "C044",
+   "order_id": "BAD44",
+   "damage_conf": 0.95,
+   "amount_inr": 2999,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "reject"
+ },
+ {
+  "claim": {
+   "id": "C045",
+   "order_id": "BAD45",
+   "damage_conf": 0.95,
+   "amount_inr": 499,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "reject"
+ },
+ {
+  "claim": {
+   "id": "C046",
+   "order_id": "ORD0046",
+   "damage_conf": 0.95,
+   "amount_inr": 1499,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "approve"
+ },
+ {
+  "claim": {
+   "id": "C047",
+   "order_id": "BAD47",
+   "damage_conf": 0.95,
+   "amount_inr": 2999,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "reject"
+ },
+ {
+  "claim": {
+   "id": "C048",
+   "order_id": "ORD0048",
+   "damage_conf": 0.95,
+   "amount_inr": 499,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "approve"
+ },
+ {
+  "claim": {
+   "id": "C049",
+   "order_id": "ORD0049",
+   "damage_conf": 0.95,
+   "amount_inr": 2999,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken",
+   "duplicate_image": true
+  },
+  "expected": "escalate"
+ },
+ {
+  "claim": {
+   "id": "C050",
+   "order_id": "BAD50",
+   "damage_conf": 0.95,
+   "amount_inr": 1499,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "reject"
+ },
+ {
+  "claim": {
+   "id": "C051",
+   "order_id": "ORD0051",
+   "damage_conf": 0.6,
+   "amount_inr": 2999,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "escalate"
+ },
+ {
+  "claim": {
+   "id": "C052",
+   "order_id": "ORD0052",
+   "damage_conf": 0.95,
+   "amount_inr": 499,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken",
+   "modalities_agree": false
+  },
+  "expected": "escalate"
+ },
+ {
+  "claim": {
+   "id": "C053",
+   "order_id": "BAD53",
+   "damage_conf": 0.95,
+   "amount_inr": 1499,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "reject"
+ },
+ {
+  "claim": {
+   "id": "C054",
+   "order_id": "ORD0054",
+   "damage_conf": 0.95,
+   "amount_inr": 2999,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "approve"
+ },
+ {
+  "claim": {
+   "id": "C055",
+   "order_id": "ORD0055",
+   "damage_conf": 0.95,
+   "amount_inr": 1499,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "approve"
+ },
+ {
+  "claim": {
+   "id": "C056",
+   "order_id": "ORD0056",
+   "damage_conf": 0.95,
+   "amount_inr": 499,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "approve"
+ },
+ {
+  "claim": {
+   "id": "C057",
+   "order_id": "ORD0057",
+   "damage_conf": 0.95,
+   "amount_inr": 499,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken",
+   "duplicate_image": true
+  },
+  "expected": "escalate"
+ },
+ {
+  "claim": {
+   "id": "C058",
+   "order_id": "ORD0058",
+   "damage_conf": 0.95,
+   "amount_inr": 1499,
+   "days_since_delivery": 12,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "reject"
+ },
+ {
+  "claim": {
+   "id": "C059",
+   "order_id": "ORD0059",
+   "damage_conf": 0.6,
+   "amount_inr": 1499,
+   "days_since_delivery": 2,
+   "text": "box was crushed and the item is broken"
+  },
+  "expected": "escalate"
+ }
+]
