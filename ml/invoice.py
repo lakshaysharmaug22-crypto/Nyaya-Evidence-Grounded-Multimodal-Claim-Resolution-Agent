@@ -31,7 +31,8 @@ def parse_text(text: str) -> dict:
     date = DATE_RE.search(text)
     return {"order_id": order.group(1).replace(" ", "").replace("-", "").upper() if order else None,
             "amount_inr": max(amounts) if amounts else None,        # the grand total is the largest labelled amount
-            "date": date.group(1) if date else None}
+            "date": date.group(1) if date else None,
+            "raw_text": text.strip()[:1500]}
 
 
 def extract(b64: str) -> dict:
@@ -40,9 +41,9 @@ def extract(b64: str) -> dict:
         if data[:5] == b"%PDF-":
             text, source = _pdf_text(data), "pdf_text"
             if len(text.strip()) < 20:                    # scanned PDF: no text layer
-                return {"order_id": None, "amount_inr": None, "date": None, "source": "scanned_pdf_unsupported"}
+                return {"order_id": None, "amount_inr": None, "date": None, "raw_text": "", "source": "scanned_pdf_unsupported"}
         else:
             text, source = _image_text(Image.open(io.BytesIO(data))), "ocr"
     except Exception as e:                                # corrupt file, missing tesseract, etc.
-        return {"order_id": None, "amount_inr": None, "date": None, "source": f"error:{type(e).__name__}"}
+        return {"order_id": None, "amount_inr": None, "date": None, "raw_text": "", "source": f"error:{type(e).__name__}"}
     return {**parse_text(text), "source": source}
