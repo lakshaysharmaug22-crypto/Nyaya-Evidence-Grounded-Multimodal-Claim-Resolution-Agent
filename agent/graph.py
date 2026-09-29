@@ -2,7 +2,7 @@
 from typing import TypedDict
 from langgraph.graph import StateGraph, START, END
 
-from . import tools
+from . import history, tools
 from .policy import Evidence, decide
 from ml import predict
 from ml.dedupe import DupIndex
@@ -79,7 +79,7 @@ def fuse(s: State):
         amount_inr=s["invoice"]["amount_inr"],
         text_photo_invoice_agree=c.get("modalities_agree", True) and text_photo_ok and invoice_ok,
         duplicate_image=c.get("duplicate_image", False) or s["photo"].get("duplicate", False),
-        repeat_claimant=c.get("repeat_claimant", False),
+        repeat_claimant=c.get("repeat_claimant", False) or history.is_repeat(c.get("customer_id")),
     )
     est = predict.refund(kind, ev.amount_inr, ev.days_since_delivery, ev.damage_conf) if kind else None
     return {"evidence": {**ev.__dict__, "claim_type": kind, "est_refund_inr": est}, "decision": decide(ev)}

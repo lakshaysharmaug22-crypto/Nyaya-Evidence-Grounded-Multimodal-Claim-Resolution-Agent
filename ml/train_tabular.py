@@ -26,7 +26,7 @@ def main(n: int = 6000):
     rows = make(n)
     tr, te = train_test_split(rows, test_size=.25, random_state=3)
 
-    vec = TfidfVectorizer(ngram_range=(1, 2), min_df=1)
+    vec = TfidfVectorizer(ngram_range=(1, 2), min_df=1, stop_words="english")
     clf = LogisticRegression(max_iter=1000).fit(vec.fit_transform([r["text"] for r in tr]), [r["type"] for r in tr])
     pred = clf.predict(vec.transform([r["text"] for r in te]))
     f1 = f1_score([r["type"] for r in te], pred, average="macro")
