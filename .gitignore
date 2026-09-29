@@ -1,0 +1,13 @@
+.claude/
+CLAUDE.md
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+.next/
+.env
+*.onnx
+*.pt
+eval/last_run.json
+*.joblib
+ml/artifacts/

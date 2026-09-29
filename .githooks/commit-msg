@@ -1,0 +1,6 @@
+#!/bin/sh
+# Rejects AI attribution in commit messages.
+if grep -qiE "co-authored-by|generated with|claude|anthropic|noreply@anthropic" "$1"; then
+  echo "Blocked: AI attribution in commit message"
+  exit 1
+fi

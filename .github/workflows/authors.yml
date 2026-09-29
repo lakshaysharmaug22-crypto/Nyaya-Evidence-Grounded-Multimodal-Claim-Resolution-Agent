@@ -1,0 +1,14 @@
+name: authors
+on: [pull_request]
+jobs:
+  authors:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Reject AI attribution
+        run: |
+          if git log origin/${{ github.base_ref }}..HEAD --format='%an <%ae>%n%B' | grep -qiE "claude|anthropic|co-authored-by|generated with"; then
+            echo "AI attribution found"; exit 1
+          fi
