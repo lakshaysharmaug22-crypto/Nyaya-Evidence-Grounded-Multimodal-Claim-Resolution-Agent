@@ -7,3 +7,9 @@ services:
     envVars:
       - key: ALLOWED_ORIGINS
         sync: false
+      - key: AGENT_TOKEN
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: DATA_DIR
+        value: /var/data

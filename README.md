@@ -35,9 +35,21 @@ The three tools (order lookup, refund, customer notification) are served by an M
 
 Reply delivery (email / WhatsApp) is logged only and not connected yet.
 
+## Durability
+
+The graph runs on a SQLite checkpointer. If the API dies mid-claim, `GET /recoverable` lists the run and `POST /claims/{id}/resume` continues from the last finished step. Tool calls are idempotent and the keys live in SQLite too, so a restart cannot refund twice. Uploads are stored under `DATA_DIR/blobs`, not in the checkpoint.
+
+## LLM layer
+
+Policy decides; the model never can. Only review-lane cases reach the model (LangChain, structured output). It writes a short brief with findings, each carrying a quote. Quotes must appear verbatim in the claim text or invoice or the finding is dropped. Claim text is passed as untrusted data, prompt-injection phrases push a claim to review, and any model or parse failure falls back to a deterministic brief. Tokens, cost (INR) and groundedness are logged per claim and shown in `/metrics`. Set `ANTHROPIC_API_KEY` to enable it; `python -m eval.run --llm` evaluates with the real model.
+
+## Search and access
+
+Console search (`/` or Ctrl/Cmd+K) is SQLite FTS5 over claims, decisions, handoffs and replies: `damaged mug`, `decision:reject rule:duplicate_image`, `order:ORD1234`. Filters: decision, rule, lane, type, kind, customer, order. Agent endpoints need `X-Agent-Token` (`AGENT_TOKEN`). Customers can submit, hand off to a human and track a claim, but tracking needs both claim ID and order ID, and a wrong pair gives the same answer as a missing claim. Submissions are rate limited per IP.
+
 ## Deploy
 
-1. **API on Render:** New > Blueprint, point at this repo (`render.yaml`). Set `ALLOWED_ORIGINS` to your Vercel URL. The free tier sleeps when idle, so the first request is slow.
+1. **API on Render:** New > Blueprint, point at this repo (`render.yaml`). Set `ALLOWED_ORIGINS` to your Vercel URL, `AGENT_TOKEN`, and (optional) `ANTHROPIC_API_KEY`; attach a persistent disk at `DATA_DIR`. The free tier sleeps when idle, so the first request is slow.
 2. **Web on Vercel:** import the repo, set the root directory to `web`, and set `NEXT_PUBLIC_API_URL` to the Render URL. Without that variable the UI runs on its built-in mock stream.
 3. Train the CNN on Colab (`ml/README.md`), commit nothing large, and put `damage.int8.onnx` in `ml/artifacts/`. Add a `COPY` for it or mount it before enabling real image scoring in production.
 
@@ -51,4 +63,4 @@ Open `/console?demo=1` for the interviewer tools: inject a tool failure (order l
 
 ## Status
 
-Working: parallel agent graph, policy engine, retries, photo quality gate, duplicate check, tabular models, eval gate, glass UI. Pending: CNN weights, invoice OCR, voice, real gold set.
+Working: parallel agent graph, policy engine, retries, photo quality gate, duplicate check, tabular models, eval gate, glass UI. Pending: CNN weights, voice, real gold set. Eval numbers are on synthetic data until the gold set is replaced.
