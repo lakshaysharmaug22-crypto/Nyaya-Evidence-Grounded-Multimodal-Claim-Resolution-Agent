@@ -21,6 +21,20 @@ The UI runs on a local mock stream when `NEXT_PUBLIC_API_URL` is unset, so `web/
 - `ml/` CNN, classifier, regression, clustering (next)
 - `web/` Next.js UI
 
+## MCP tools
+
+The three tools (order lookup, refund, customer notification) are served by an MCP server: `python -m mcp_servers.support_tools`. The agent can load them from any MCP server over stdio (`agent/mcp_client.py`); set `USE_MCP=1` on the API to route its tool calls through the server. Retries and idempotency keys apply the same way over MCP.
+
+## Features
+
+- Photo quality gate, duplicate-image check, invoice PDF/image extraction (Tesseract)
+- Console: draft reply (editable), batch approve for the ready lane, A/R hotkeys, rejection reasons saved as an override set, per-case audit CSV
+- Customer: human handoff carrying the full case, optional voice notes (`requirements-optional.txt`)
+- Insights: drift alerts, failure clusters with readable labels, policy simulator
+- Repeat-claimant check from claim history (3 prior claims in 30 days blocks auto-approve)
+
+Reply delivery (email / WhatsApp) is logged only and not connected yet.
+
 ## Deploy
 
 1. **API on Render:** New > Blueprint, point at this repo (`render.yaml`). Set `ALLOWED_ORIGINS` to your Vercel URL. The free tier sleeps when idle, so the first request is slow.
