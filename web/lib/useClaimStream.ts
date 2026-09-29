@@ -5,10 +5,11 @@ import type { Status } from "@/components/FlowGraph";
 export type TraceEv = { tool: string; attempt: number; ok: boolean; error?: string };
 export type Final = {
   final: { decision: string; rule: string; lane: string }; verified: boolean; ms: number; trace?: TraceEv[];
+  draft_reply?: string; evidence?: Record<string, unknown> | null;
 };
 export type LogEv = { node: string; status: string };
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? "";
+export const API = process.env.NEXT_PUBLIC_API_URL ?? "";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const PAR = ["photo", "invoice", "order", "classify"];
 const SER = ["fuse", "act", "verify"];
@@ -25,8 +26,9 @@ export function useClaimStream() {
     setLog((l) => [...l, { node, status: st }]);
   };
 
-  const run = useCallback(async (claim: Record<string, unknown>) => {
+  const run = useCallback(async (claim: Record<string, unknown>): Promise<Final | null> => {
     setStatus({}); setFinal(null); setLog([]); setBusy(true);
+    let result: Final | null = null;
     try {
       if (API) {
         const res = await fetch(`${API}/claims/stream`, {
@@ -42,7 +44,7 @@ export function useClaimStream() {
           for (const p of parts) {
             const m = JSON.parse(p.replace(/^data: /, ""));
             if (m.node) mark(m.node, m.status);
-            if (m.final) setFinal(m);
+            if (m.final) { result = m; setFinal(m); }
           }
         }
       } else {
@@ -55,9 +57,15 @@ export function useClaimStream() {
         const trace: TraceEv[] = c.inject_failure
           ? [{ tool: "order_lookup", attempt: 1, ok: false, error: "order_lookup unavailable" }, { tool: "order_lookup", attempt: 2, ok: true }]
           : [{ tool: "order_lookup", attempt: 1, ok: true }];
-        setFinal({ final: { decision: dec[0], rule: dec[1], lane: dec[2] }, verified: true, ms: 2700, trace });
+        const amt = (claim as { amount_inr?: number }).amount_inr;
+        const draft = dec[0] === "approve"
+          ? `Hi, regarding claim ${claim.id}: we checked your photo, invoice and order details and approved a refund of ₹${amt?.toLocaleString("en-IN")}. It will reach your original payment method in 5-7 working days.`
+          : `Hi, regarding claim ${claim.id}: a team member is reviewing your claim and will update you shortly.`;
+        result = { final: { decision: dec[0], rule: dec[1], lane: dec[2] }, verified: true, ms: 2700, trace, draft_reply: draft };
+        setFinal(result);
       }
     } finally { setBusy(false); }
+    return result;
   }, []);
   return { status, final, busy, run, log };
 }
