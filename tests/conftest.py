@@ -1,3 +1,11 @@
+import os
+import tempfile
+
+# Must run before api.main is imported: isolated data dir, no rate limiting, open agent access by default.
+os.environ.setdefault("DATA_DIR", tempfile.mkdtemp(prefix="sra-test-"))
+os.environ.setdefault("RATE_LIMIT_PER_MIN", "100000")
+os.environ.pop("AGENT_TOKEN", None)
+os.environ.pop("ANTHROPIC_API_KEY", None)
 import base64, io
 import pytest
 from PIL import Image
@@ -31,3 +39,12 @@ def invoice_pdf_b64():
         c.save()
         return base64.b64encode(b.getvalue()).decode()
     return make
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _trained_models():
+    """Tests need the tabular models. Train them once if the artifacts are missing."""
+    from ml import predict, train_tabular
+    if not predict.PATH.exists():
+        train_tabular.main()
+    predict._m = None                       # force reload from disk

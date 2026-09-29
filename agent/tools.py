@@ -1,14 +1,52 @@
-"""Tool registry with idempotency keys, retries and failure injection. Retries never double-execute."""
+"""Tool registry with idempotency keys, retries and failure injection.
+
+Idempotency results live in memory by default. Call `use_sqlite(path)` to persist them, so a
+restarted process still knows a refund already went out and never issues it twice.
+"""
+import json
+import sqlite3
+import threading
 from typing import Callable
 
 _REGISTRY: dict[str, Callable] = {}
 _DONE: dict[str, dict] = {}
+_db: sqlite3.Connection | None = None
+_lock = threading.Lock()
 FAIL_ONCE: set[str] = set()          # "tool:idem_key" entries that fail on their first attempt (demo / tests)
 EVENTS: dict[str, list] = {}         # idem_key -> trace events
 
 
 class ToolError(Exception):
     pass
+
+
+def use_sqlite(path: str):
+    """Persist idempotency results in SQLite (call once at startup)."""
+    global _db
+    with _lock:
+        _db = sqlite3.connect(path, check_same_thread=False)
+        _db.execute("create table if not exists done (key text primary key, result text not null)")
+        _db.commit()
+
+
+def _get(key: str) -> dict | None:
+    with _lock:
+        if key in _DONE:
+            return _DONE[key]
+        if _db is not None:
+            row = _db.execute("select result from done where key=?", (key,)).fetchone()
+            if row:
+                _DONE[key] = json.loads(row[0])
+                return _DONE[key]
+    return None
+
+
+def _put(key: str, result: dict):
+    with _lock:
+        _DONE[key] = result
+        if _db is not None:
+            _db.execute("insert or replace into done values (?, ?)", (key, json.dumps(result)))
+            _db.commit()
 
 
 def tool(name: str):
@@ -21,15 +59,16 @@ def tool(name: str):
 def call(name: str, idem_key: str, retries: int = 2, **kwargs) -> dict:
     key = f"{name}:{idem_key}"
     ev = EVENTS.setdefault(idem_key, [])
-    if key in _DONE:
-        return _DONE[key]
+    cached = _get(key)
+    if cached is not None:
+        return cached
     for attempt in range(retries + 1):
         try:
             if key in FAIL_ONCE:
                 FAIL_ONCE.discard(key)
                 raise ToolError(f"{name} unavailable")
             result = _REGISTRY[name](**kwargs)
-            _DONE[key] = result
+            _put(key, result)
             ev.append({"tool": name, "attempt": attempt + 1, "ok": True})
             return result
         except ToolError as e:

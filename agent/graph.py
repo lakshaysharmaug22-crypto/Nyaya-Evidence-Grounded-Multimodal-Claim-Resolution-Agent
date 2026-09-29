@@ -1,18 +1,35 @@
-"""LangGraph workflow: parallel evidence gathering -> fusion -> policy -> action -> verify."""
-from typing import TypedDict
-from langgraph.graph import StateGraph, START, END
+"""LangGraph workflow.
 
-from . import history, tools
-from .policy import Evidence, decide
+parallel evidence gathering -> fusion + policy -> (review lane only) LLM brief -> action -> verification
+
+Pass a checkpointer to `build()` to get durable state: a crashed run resumes from its last completed step.
+"""
+import base64
+import io
+from typing import TypedDict
+
+from langgraph.graph import END, START, StateGraph
+from PIL import Image
+
 from ml import predict
 from ml.dedupe import DupIndex
 from ml.infer import damage_confidence
 from ml.invoice import extract as extract_invoice
 from ml.quality_gate import check as quality_check
-import base64, io
-from PIL import Image
+
+from . import blobs, history, llm, tools
+from .guard import looks_like_injection
+from .policy import Evidence, decide
 
 _dups = DupIndex()
+_reader: llm.Reader | None = None
+CRASH_BEFORE_ACT: set[str] = set()       # test hooks: claim ids that crash once, to prove resume works
+CRASH_AFTER_REFUND: set[str] = set()
+
+
+def set_reader(reader: "llm.Reader | None"):
+    global _reader
+    _reader = reader
 
 
 class State(TypedDict, total=False):
@@ -23,13 +40,14 @@ class State(TypedDict, total=False):
     kind: dict
     evidence: dict
     decision: dict
+    brief: dict
     action: dict
     verified: bool
 
 
 def analyse_photo(s: State):
     c = s["claim"]
-    b64 = c.get("image_b64")
+    b64 = blobs.get_b64(c, "image")
     if not b64:                                   # no image: use supplied score (tests / mock claims)
         return {"photo": {"damage_conf": c.get("damage_conf", 0.0), "duplicate": False}}
     img = Image.open(io.BytesIO(base64.b64decode(b64)))
@@ -42,9 +60,10 @@ def analyse_photo(s: State):
 
 def parse_invoice(s: State):
     c = s["claim"]
-    if not c.get("invoice_b64"):
+    b64 = blobs.get_b64(c, "invoice")
+    if not b64:
         return {"invoice": {"amount_inr": c.get("amount_inr", 0.0), "extracted": None}}
-    ex = extract_invoice(c["invoice_b64"])
+    ex = extract_invoice(b64)
     amount = ex["amount_inr"] if ex["amount_inr"] is not None else c.get("amount_inr", 0.0)
     return {"invoice": {"amount_inr": amount, "extracted": ex}}
 
@@ -80,17 +99,37 @@ def fuse(s: State):
         text_photo_invoice_agree=c.get("modalities_agree", True) and text_photo_ok and invoice_ok,
         duplicate_image=c.get("duplicate_image", False) or s["photo"].get("duplicate", False),
         repeat_claimant=c.get("repeat_claimant", False) or history.is_repeat(c.get("customer_id")),
+        suspicious_text=looks_like_injection(c.get("text")),
     )
     est = predict.refund(kind, ev.amount_inr, ev.days_since_delivery, ev.damage_conf) if kind else None
+    if est and est > 50 and ev.damage_conf >= 0.5:      # the regressor is unreliable when the photo shows little
+        ev.amount_ratio = round(ev.amount_inr / est, 2)
     return {"evidence": {**ev.__dict__, "claim_type": kind, "est_refund_inr": est}, "decision": decide(ev)}
 
 
+def route_after_fuse(s: State) -> str:
+    """Clear cases skip the LLM entirely: this is where most of the cost saving comes from."""
+    return "n_read" if s["decision"]["lane"] == "review" else "n_act"
+
+
+def read(s: State):
+    sources = llm.sources_from_state(s)
+    if _reader is None:
+        return {"brief": llm.fallback(s["decision"], sources)}
+    return {"brief": _reader.read(sources, s["decision"])}
+
+
 def act(s: State):
+    c = s["claim"]
+    if c["id"] in CRASH_BEFORE_ACT:
+        CRASH_BEFORE_ACT.discard(c["id"])
+        raise RuntimeError("simulated crash before action")
     if s["decision"]["decision"] != "approve":
         return {"action": {"status": "held_for_human"}}
-    c = s["claim"]
-    r = tools.call("issue_refund", c["id"], order_id=c["order_id"],
-                   amount_inr=s["invoice"]["amount_inr"])
+    r = tools.call("issue_refund", c["id"], order_id=c["order_id"], amount_inr=s["invoice"]["amount_inr"])
+    if c["id"] in CRASH_AFTER_REFUND:
+        CRASH_AFTER_REFUND.discard(c["id"])
+        raise RuntimeError("simulated crash after refund")
     tools.call("notify_customer", c["id"], order_id=c["order_id"], message="Refund issued")
     return {"action": r}
 
@@ -102,15 +141,16 @@ def verify(s: State):
     return {"verified": ok}
 
 
-def build():
+def build(checkpointer=None):
     g = StateGraph(State)
     par = [("n_photo", analyse_photo), ("n_invoice", parse_invoice), ("n_order", lookup_order), ("n_classify", classify)]
-    for name, fn in par + [("n_fuse", fuse), ("n_act", act), ("n_verify", verify)]:
+    for name, fn in par + [("n_fuse", fuse), ("n_read", read), ("n_act", act), ("n_verify", verify)]:
         g.add_node(name, fn)
     for name, _ in par:                      # parallel evidence gathering
         g.add_edge(START, name)
     g.add_edge([n for n, _ in par], "n_fuse")  # fan-in: waits for all branches
-    g.add_edge("n_fuse", "n_act")
+    g.add_conditional_edges("n_fuse", route_after_fuse, {"n_read": "n_read", "n_act": "n_act"})
+    g.add_edge("n_read", "n_act")
     g.add_edge("n_act", "n_verify")
     g.add_edge("n_verify", END)
-    return g.compile()
+    return g.compile(checkpointer=checkpointer)

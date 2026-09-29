@@ -11,3 +11,5 @@ node_modules/
 eval/last_run.json
 *.joblib
 ml/artifacts/
+data/
+web/next-env.d.ts
