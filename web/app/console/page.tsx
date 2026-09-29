@@ -1,20 +1,16 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Glass } from "@/components/Glass";
 import { FlowGraph } from "@/components/FlowGraph";
+import { BriefView } from "@/components/BriefView";
+import { AgentSearch } from "@/components/AgentSearch";
 import { API, Final, useClaimStream } from "@/lib/useClaimStream";
+import { agentFetch, downloadFromApi } from "@/lib/agent";
+import { Item, QUEUE } from "@/lib/queue";
 import { DemoBar, useDemo } from "@/components/DemoBar";
 
-type Item = { id: string; who: string; amt: number; conf: number; claim: Record<string, unknown> };
-const QUEUE: Item[] = [
-  { id: "C-101", who: "Asha R.", amt: 1499, conf: 0.95, claim: { id: "C-101", order_id: "ORD101", text: "box was crushed and the item is broken", damage_conf: 0.95, amount_inr: 1499, days_since_delivery: 2 } },
-  { id: "C-102", who: "Vikram S.", amt: 999, conf: 0.93, claim: { id: "C-102", order_id: "ORD102", text: "product came with a dent and scratches", damage_conf: 0.93, amount_inr: 999, days_since_delivery: 1 } },
-  { id: "C-103", who: "Neha T.", amt: 2999, conf: 0.61, claim: { id: "C-103", order_id: "ORD103", text: "received it damaged, photo attached", damage_conf: 0.61, amount_inr: 2999, days_since_delivery: 3 } },
-  { id: "C-104", who: "Rohit K.", amt: 1499, conf: 0.9, claim: { id: "C-104", order_id: "ORD104", text: "screen is cracked when it arrived", damage_conf: 0.9, amount_inr: 1499, days_since_delivery: 12 } },
-];
-
-const post = (path: string, body: unknown) =>
-  API ? fetch(`${API}${path}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => null) : Promise.resolve(null);
+const post = (path: string, body?: unknown) =>
+  API ? agentFetch(path, { method: "POST", body: body ? JSON.stringify(body) : undefined }).catch(() => null) : Promise.resolve(null);
 
 function downloadCsv(id: string, f: Final) {
   const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
@@ -22,6 +18,73 @@ function downloadCsv(id: string, f: Final) {
     [id, f.final.decision, f.final.rule, f.final.lane, f.ms, f.verified, JSON.stringify(f.trace ?? [])]];
   const blob = new Blob([rows.map((r) => r.map(esc).join(",")).join("\n")], { type: "text/csv" });
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `${id}-audit.csv`; a.click();
+}
+
+type CaseData = {
+  run: { id: string; decision: string; rule: string; lane: string; text: string; order_id?: string; evidence: Record<string, unknown>;
+    trace: { tool: string; attempt: number; ok: boolean }[]; draft_reply?: string; brief?: import("@/components/BriefView").Brief["brief"] & { } | null;
+    llm_used?: boolean; cost_inr?: number; groundedness?: number | null };
+  decisions: { action: string; reason: string }[]; handoffs: string[];
+};
+
+/** Read-only view of any logged case, opened from search. */
+function CaseCard({ id, onClose }: { id: string; onClose: () => void }) {
+  const [d, setD] = useState<CaseData | null>(null);
+  const [err, setErr] = useState("");
+  const [reason, setReason] = useState("");
+  const [rejecting, setRejecting] = useState(false);
+  const [note, setNote] = useState("");
+
+  const load = useCallback(async () => {
+    setErr(""); setD(null);
+    try {
+      const r = await agentFetch(`/cases/${encodeURIComponent(id)}`);
+      if (r.status === 404) return setErr("No logged run for this claim yet.");
+      if (!r.ok) return setErr("Could not load this case.");
+      setD(await r.json());
+    } catch { setErr("Could not reach the server."); }
+  }, [id]);
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => { window.addEventListener("agent-token-set", load); return () => window.removeEventListener("agent-token-set", load); }, [load]);
+
+  const decide = async (action: "approve" | "reject") => {
+    if (action === "reject" && !rejecting) return setRejecting(true);
+    if (action === "reject" && !reason.trim()) return;
+    const r = await agentFetch("/decisions", { method: "POST", body: JSON.stringify({ id, action, reason }) });
+    setNote(r.ok ? `Recorded: ${action}${reason ? ` (${reason})` : ""}` : "Could not save the decision."); setRejecting(false); load();
+  };
+  const run = d?.run;
+  return (
+    <Glass solid style={{ marginBottom: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between" }}>
+        <h2>Case {id}</h2><button className="pill" style={{ background: "transparent", color: "inherit", cursor: "pointer" }} onClick={onClose}>Close</button>
+      </div>
+      {err && <p style={{ color: "#ff8a8a" }}>{err}</p>}
+      {!d && !err && <p className="muted">Loading...</p>}
+      {run && (
+        <>
+          <div><b style={{ textTransform: "capitalize" }}>{run.decision}</b> · rule {run.rule} · {run.lane} lane · order {run.order_id}</div>
+          <p className="muted">“{run.text}”</p>
+          <table style={{ fontSize: 13, borderCollapse: "collapse", margin: "8px 0" }}><tbody>
+            {Object.entries(run.evidence).filter(([, v]) => v !== null && typeof v !== "object").map(([k, v]) => (
+              <tr key={k}><td style={{ opacity: .65, paddingRight: 16 }}>{k.replace(/_/g, " ")}</td><td>{String(v)}</td></tr>))}
+          </tbody></table>
+          {run.brief && <BriefView b={{ llm_used: !!run.llm_used, cost_inr: run.cost_inr ?? 0, groundedness: run.groundedness, brief: run.brief }} />}
+          <div className="muted" style={{ marginTop: 8 }}>Tools: {run.trace.map((t) => `${t.tool}${t.ok ? "" : " (failed, retried)"}`).join(" → ")}</div>
+          {d!.decisions.map((x, i) => <div key={i} className="muted">Human: {x.action}{x.reason && ` — ${x.reason}`}</div>)}
+          {d!.handoffs.map((h, i) => <div key={i} className="muted" style={{ color: "#ffb454" }}>Customer asked for a person{h && `: “${h}”`}</div>)}
+          <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+            <button className="btn go" onClick={() => decide("approve")}>Approve</button>
+            <button className="btn no" onClick={() => decide("reject")}>{rejecting ? "Confirm reject" : "Reject"}</button>
+            <button className="btn" style={{ background: "rgba(255,255,255,.14)" }} onClick={() => downloadFromApi(`/audit/${encodeURIComponent(id)}.csv`, `${id}-audit.csv`)}>Export CSV</button>
+          </div>
+          {rejecting && <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason required"
+            style={{ marginTop: 10, width: "100%", padding: 10, borderRadius: 12, border: "1px solid rgba(255,255,255,.2)", background: "rgba(0,0,0,.25)", color: "inherit" }} />}
+          {note && <p className="muted" style={{ color: "#2ee6a6" }}>{note}</p>}
+        </>
+      )}
+    </Glass>
+  );
 }
 
 export default function Console() {
@@ -36,9 +99,29 @@ export default function Console() {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [sent, setSent] = useState<Record<string, boolean>>({});
   const [analysing, setAnalysing] = useState(false);
+  const [opened, setOpened] = useState<string | null>(null);
+  const [stuck, setStuck] = useState<{ id: string }[]>([]);
 
   const res = results[sel.id];
   const ready = QUEUE.filter((q) => results[q.id]?.final.lane === "ready" && !reviewed[q.id]);
+
+  // open a case from search (?claim=ID or the open-case event)
+  useEffect(() => {
+    const fromUrl = new URLSearchParams(window.location.search).get("claim");
+    if (fromUrl) setOpened(fromUrl);
+    const h = (e: Event) => setOpened((e as CustomEvent<string>).detail);
+    window.addEventListener("open-case", h); return () => window.removeEventListener("open-case", h);
+  }, []);
+  const inQueue = opened ? QUEUE.find((q) => q.id === opened) : undefined;
+  useEffect(() => { if (inQueue) setSel(inQueue); }, [inQueue]);
+
+  // runs that stopped mid-way (crash / restart) and can be resumed
+  const loadStuck = useCallback(async () => {
+    if (!API) return;
+    try { const r = await agentFetch("/recoverable"); if (r.ok) setStuck(await r.json()); } catch { /* offline */ }
+  }, []);
+  useEffect(() => { loadStuck(); window.addEventListener("agent-token-set", loadStuck); return () => window.removeEventListener("agent-token-set", loadStuck); }, [loadStuck]);
+  const resume = async (id: string) => { await agentFetch(`/claims/${encodeURIComponent(id)}/resume`, { method: "POST" }); loadStuck(); setOpened(id); };
 
   const analyse = async (q: Item) => {
     const r = await run({ ...q.claim, inject_failure: inject });
@@ -84,7 +167,15 @@ export default function Console() {
   return (
     <div className="wrap" style={{ maxWidth: 1100 }}>
       <h1>Agent console</h1>
-      <p className="muted">Ready lane: approve in one tap. Review lane: needs a human look. Press A to approve, R to reject.</p>
+      <p className="muted">Ready lane: approve in one tap. Review lane: needs a human look. Press A to approve, R to reject, / to search.</p>
+      <AgentSearch />
+      {stuck.length > 0 && (
+        <Glass solid style={{ marginBottom: 16 }}>
+          <b>{stuck.length} run{stuck.length > 1 ? "s" : ""} stopped mid-way.</b>{" "}
+          {stuck.slice(0, 5).map((s) => <button key={s.id} className="pill" style={{ background: "transparent", color: "inherit", cursor: "pointer", marginRight: 6 }} onClick={() => resume(s.id)}>Resume {s.id}</button>)}
+        </Glass>
+      )}
+      {opened && !inQueue && <CaseCard id={opened} onClose={() => setOpened(null)} />}
       {demo && <DemoBar inject={inject} setInject={setInject} log={log} trace={final?.trace} />}
       <div className="grid" style={{ gridTemplateColumns: "minmax(200px,1fr) minmax(0,1.5fr) minmax(200px,1fr)" }}>
         <Glass>
@@ -112,11 +203,12 @@ export default function Console() {
             <Glass solid style={{ marginTop: 14 }}>
               <div className="muted">Why</div>
               <div><b style={{ textTransform: "capitalize" }}>{res.final.decision}</b> · rule {res.final.rule} · {res.final.lane} lane</div>
+              {res.brief && <BriefView b={res.brief} />}
               <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
                 <button className="btn go" onClick={approve}>Approve (A)</button>
                 <button className="btn no" onClick={reject}>{rejecting ? "Confirm reject" : "Reject (R)"}</button>
                 <button className="btn" style={{ background: "rgba(255,255,255,.14)" }}
-                  onClick={() => API ? window.open(`${API}/audit/${sel.id}.csv`) : downloadCsv(sel.id, res)}>Export CSV</button>
+                  onClick={() => API ? downloadFromApi(`/audit/${sel.id}.csv`, `${sel.id}-audit.csv`) : downloadCsv(sel.id, res)}>Export CSV</button>
               </div>
               {rejecting && <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason required (saved to the override set)"
                 style={{ marginTop: 10, width: "100%", padding: 10, borderRadius: 12, border: "1px solid rgba(255,255,255,.2)", background: "rgba(0,0,0,.25)", color: "inherit" }} />}

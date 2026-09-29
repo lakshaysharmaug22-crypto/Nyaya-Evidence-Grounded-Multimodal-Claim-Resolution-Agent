@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Glass } from "@/components/Glass";
 
 import { API } from "@/lib/useClaimStream";
+import { agentFetch } from "@/lib/agent";
+import { AgentSearch } from "@/components/AgentSearch";
 
 // Deterministic sample cases so the simulator is never empty. Replace with real logged cases.
 function sample(n = 100) {
@@ -35,7 +37,7 @@ const SAMPLE_CLUSTERS = [
   { terms: ["charger", "included", "box"], count: 6 }, { terms: ["match", "listing"], count: 5 }];
 const fmt = (metric: string, v: number) => (metric.includes("p95") ? `${Math.round(v * 10) / 10} ms` : `${Math.round(v * 100)}%`);
 const CURRENT = { minConf: 0.9, maxAmt: 5000 };
-type M = { n: number; auto_resolve_rate?: number; verified_rate?: number; p95_ms?: number; recovered?: number };
+type M = { n: number; auto_resolve_rate?: number; verified_rate?: number; p95_ms?: number; recovered?: number; llm_routed_rate?: number; avg_cost_inr?: number; groundedness?: number | null };
 
 export default function Insights() {
   const cases = useMemo(() => sample(), []);
@@ -48,9 +50,15 @@ export default function Insights() {
 
   useEffect(() => {
     if (!API) return;
-    fetch(`${API}/metrics`).then((r) => r.json()).then(setM).catch(() => setM(null));
-    fetch(`${API}/drift`).then((r) => r.json()).then(setLiveDrift).catch(() => setLiveDrift(null));
-    fetch(`${API}/clusters`).then((r) => r.json()).then(setLiveClusters).catch(() => setLiveClusters(null));
+    const load = () => {
+      const get = (path: string) => agentFetch(path).then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.json(); });
+      get("/metrics").then(setM).catch(() => setM(null));
+      get("/drift").then(setLiveDrift).catch(() => setLiveDrift(null));
+      get("/clusters").then(setLiveClusters).catch(() => setLiveClusters(null));
+    };
+    load();
+    window.addEventListener("agent-token-set", load);
+    return () => window.removeEventListener("agent-token-set", load);
   }, []);
 
   const sim = (c: number, a: number) => {
@@ -65,12 +73,15 @@ export default function Insights() {
   const maxC = Math.max(...clusters.map((c) => c.count));
   const tiles: [string, string][] = live
     ? [["Runs", String(m!.n)], ["Auto-resolve", `${Math.round((m!.auto_resolve_rate ?? 0) * 100)}%`],
-       ["Verified", `${Math.round((m!.verified_rate ?? 0) * 100)}%`], ["p95 latency", `${m!.p95_ms} ms`], ["Recovered failures", String(m!.recovered ?? 0)]]
+       ["Verified", `${Math.round((m!.verified_rate ?? 0) * 100)}%`], ["p95 latency", `${m!.p95_ms} ms`], ["Recovered failures", String(m!.recovered ?? 0)],
+       ["Sent to AI", `${Math.round((m!.llm_routed_rate ?? 0) * 100)}%`], ["Avg cost / case", `₹${(m!.avg_cost_inr ?? 0).toFixed(3)}`],
+       ["Findings verified", m!.groundedness == null ? "n/a" : `${Math.round(m!.groundedness * 100)}%`]]
     : [["Runs", "sample"], ["Auto-resolve", `${cur.auto}%`], ["Wrong approvals", `${cur.wrong}`], ["p95 latency", "n/a"], ["Recovered failures", "n/a"]];
 
   return (
     <div className="wrap" style={{ maxWidth: 1000 }}>
       <h1>Insights</h1>
+      <AgentSearch />
       <p className="muted">{live ? "Live metrics from the running API." : "Sample data. Connect the API to see live runs."}</p>
       <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", marginBottom: 16 }}>
         {tiles.map(([k, v]) => (

@@ -5,7 +5,7 @@ import type { Status } from "@/components/FlowGraph";
 export type TraceEv = { tool: string; attempt: number; ok: boolean; error?: string };
 export type Final = {
   final: { decision: string; rule: string; lane: string }; verified: boolean; ms: number; trace?: TraceEv[];
-  draft_reply?: string; evidence?: Record<string, unknown> | null;
+  draft_reply?: string; evidence?: Record<string, unknown> | null; brief?: import("@/components/BriefView").Brief | null;
 };
 export type LogEv = { node: string; status: string };
 
@@ -20,6 +20,7 @@ export function useClaimStream() {
   const [final, setFinal] = useState<Final | null>(null);
   const [busy, setBusy] = useState(false);
   const [log, setLog] = useState<LogEv[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   const mark = (node: string, st: "running" | "done") => {
     setStatus((s) => ({ ...s, [node]: st }));
@@ -27,7 +28,7 @@ export function useClaimStream() {
   };
 
   const run = useCallback(async (claim: Record<string, unknown>): Promise<Final | null> => {
-    setStatus({}); setFinal(null); setLog([]); setBusy(true);
+    setStatus({}); setFinal(null); setLog([]); setError(null); setBusy(true);
     let result: Final | null = null;
     try {
       if (API) {
@@ -44,6 +45,7 @@ export function useClaimStream() {
           for (const p of parts) {
             const m = JSON.parse(p.replace(/^data: /, ""));
             if (m.node) mark(m.node, m.status);
+            if (m.error) setError(m.resumable ? `${m.error}. A person can resume it from the console.` : m.error);
             if (m.final) { result = m; setFinal(m); }
           }
         }
@@ -67,5 +69,5 @@ export function useClaimStream() {
     } finally { setBusy(false); }
     return result;
   }, []);
-  return { status, final, busy, run, log };
+  return { status, final, busy, run, log, error };
 }

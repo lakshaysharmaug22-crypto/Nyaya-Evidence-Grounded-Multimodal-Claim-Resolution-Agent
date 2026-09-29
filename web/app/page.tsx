@@ -22,7 +22,12 @@ export default function Customer() {
   const [img, setImg] = useState<string | undefined>();
   const [inv, setInv] = useState<string | undefined>();
   const [invName, setInvName] = useState("");
-  const { status, final, busy, run } = useClaimStream();
+  const { status, final, busy, run, error } = useClaimStream();
+  const [orderId, setOrderId] = useState("");
+  const [tId, setTId] = useState("");
+  const [tOrder, setTOrder] = useState("");
+  const [tRes, setTRes] = useState<{ ok: boolean; text: string } | null>(null);
+  const [tBusy, setTBusy] = useState(false);
   const [claimId, setClaimId] = useState("");
   const [handoff, setHandoff] = useState("");
   const [rec, setRec] = useState<MediaRecorder | null>(null);
@@ -70,11 +75,13 @@ export default function Customer() {
       <div className="grid two">
         <Glass>
           <h2>Your claim</h2>
+          <input value={orderId} onChange={(e) => setOrderId(e.target.value)} placeholder="Order ID (e.g. ORD1234)" aria-label="Order ID"
+            style={{ width: "100%", padding: 10, marginBottom: 10, borderRadius: 12, border: "1px solid rgba(255,255,255,.2)", background: "rgba(0,0,0,.25)", color: "inherit" }} />
           <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="What went wrong?" />
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "12px 0" }}>
             {Object.entries(PRESETS).map(([k, v]) => (
               <button key={k} className="pill" style={{ background: "transparent", color: "inherit", cursor: "pointer" }}
-                onClick={() => { setText(v.text); setClaim(v.claim); }}>{k}</button>
+                onClick={() => { setText(v.text); setClaim(v.claim); setOrderId(String(v.claim.order_id)); }}>{k}</button>
             ))}
           </div>
           {API && <button className="pill" style={{ background: rec ? "rgba(255,80,90,.3)" : "transparent", color: "inherit", cursor: "pointer", marginRight: 8 }}
@@ -96,8 +103,9 @@ export default function Customer() {
             </div>
           )}
           <div style={{ marginTop: 14 }}>
-            <button className="btn go" disabled={busy || !text || blocked}
-              onClick={() => { const id = "C" + Date.now(); setClaimId(id); run({ id, order_id: "ORD1", text, ...claim, ...(img ? { image_b64: img } : {}), ...(inv ? { invoice_b64: inv } : {}) }); }}>
+            <button className="btn go" disabled={busy || !text || !orderId.trim() || blocked}
+              onClick={() => { const id = "C" + Date.now(); const order = orderId.trim() || String(claim.order_id ?? "");
+                setClaimId(id); setTId(id); setTOrder(order); run({ id, text, ...claim, order_id: order, ...(img ? { image_b64: img } : {}), ...(inv ? { invoice_b64: inv } : {}) }); }}>
               {busy ? "Working..." : "Submit claim"}
             </button>
             <button className="pill" style={{ marginLeft: 8, background: "transparent", color: "inherit", cursor: "pointer" }} onClick={talkToHuman}>Talk to a human</button>
@@ -107,8 +115,34 @@ export default function Customer() {
         <Glass>
           <h2>Live status</h2>
           {!started ? <p className="muted">Nothing yet. Submit a claim to watch it resolve.</p> : <FlowGraph status={status} />}
+          {error && <p style={{ color: "#ff8a8a" }}>{error}</p>}
         </Glass>
       </div>
+      <Glass style={{ marginTop: 16 }}>
+        <h2>Track a claim</h2>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <input value={tId} onChange={(e) => setTId(e.target.value)} placeholder="Claim ID" aria-label="Claim ID" style={{ flex: 1, minWidth: 130, padding: 10, borderRadius: 12, border: "1px solid rgba(255,255,255,.2)", background: "rgba(0,0,0,.25)", color: "inherit" }} />
+          <input value={tOrder} onChange={(e) => setTOrder(e.target.value)} placeholder="Order ID" aria-label="Order ID to track" style={{ flex: 1, minWidth: 130, padding: 10, borderRadius: 12, border: "1px solid rgba(255,255,255,.2)", background: "rgba(0,0,0,.25)", color: "inherit" }} />
+          <button className="btn go" disabled={tBusy || !tId.trim() || !tOrder.trim()} onClick={async () => {
+            setTBusy(true); setTRes(null);
+            try {
+              if (!API) {                                            // static demo: only the claim submitted in this session exists
+                const mine = final && claimId && tId.trim() === claimId && tOrder.trim().toLowerCase() === (orderId || String(claim.order_id ?? "")).trim().toLowerCase();
+                setTRes(mine ? { ok: true, text: final!.final.decision === "approve" ? "Approved. Your refund is on its way (5-7 working days)." : "A team member is reviewing your claim." }
+                  : { ok: false, text: "We couldn't find a claim with those details." });
+              } else {
+                const r = await fetch(`${API}/track?claim_id=${encodeURIComponent(tId.trim())}&order_id=${encodeURIComponent(tOrder.trim())}`);
+                if (r.status === 429) setTRes({ ok: false, text: "Too many attempts. Please wait a minute and try again." });
+                else if (!r.ok) setTRes({ ok: false, text: "We couldn't find a claim with those details. Check both IDs." });
+                else setTRes({ ok: true, text: (await r.json()).message });
+              }
+            } catch { setTRes({ ok: false, text: "Could not reach support. Please try again." }); }
+            setTBusy(false);
+          }}>{tBusy ? "Checking..." : "Check status"}</button>
+        </div>
+        {tRes && <p style={{ color: tRes.ok ? "#2ee6a6" : "#ffb454" }}>{tRes.text}</p>}
+        <p className="muted">You need both your claim ID and order ID.</p>
+      </Glass>
       {final && (
         <Glass solid style={{ marginTop: 16 }}>
           <h2>Decision</h2>
