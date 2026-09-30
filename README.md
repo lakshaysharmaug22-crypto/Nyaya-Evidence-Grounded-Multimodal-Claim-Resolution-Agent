@@ -4,6 +4,8 @@
 <p align="center"><b>Evidence-Grounded Multimodal Claim Resolution Agent</b><br>
 LangGraph · FastAPI · Next.js · CNN · policy engine · grounded LLM · durable resume</p>
 
+<p align="center"><a href="https://github.com/lakshaysharmaug22-crypto/Nyaya-Evidence-Grounded-Multimodal-Claim-Resolution-Agent/actions/workflows/eval.yml"><img src="https://github.com/lakshaysharmaug22-crypto/Nyaya-Evidence-Grounded-Multimodal-Claim-Resolution-Agent/actions/workflows/eval.yml/badge.svg?branch=main" alt="eval CI"></a> <a href="https://github.com/lakshaysharmaug22-crypto/Nyaya-Evidence-Grounded-Multimodal-Claim-Resolution-Agent/actions/workflows/authors.yml"><img src="https://github.com/lakshaysharmaug22-crypto/Nyaya-Evidence-Grounded-Multimodal-Claim-Resolution-Agent/actions/workflows/authors.yml/badge.svg?branch=main" alt="authors check"></a> <a href="https://nyaya-evidence-grounded-multimodal.vercel.app"><img src="https://img.shields.io/badge/live-vercel-000?logo=vercel" alt="Live on Vercel"></a></p>
+
 <p align="center"><b>Live app: <a href="https://nyaya-evidence-grounded-multimodal.vercel.app">nyaya-evidence-grounded-multimodal.vercel.app</a></b> · <a href="https://nyaya-evidence-grounded-multimodal.vercel.app/console">Console</a> · <a href="docs/ARCHITECTURE.md">Architecture</a> · <a href="eval/gold/README.md">Gold-set protocol</a> · <a href="ml/README.md">ML</a></p>
 
 <p align="center"><img src="docs/demo.gif" alt="Nyaya demo: a customer claim resolved live, the agent console, search and insights" width="880"></p>
