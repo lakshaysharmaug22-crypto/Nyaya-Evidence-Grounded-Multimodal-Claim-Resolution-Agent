@@ -19,3 +19,4 @@ ml/artifacts/*
 data/
 web/next-env.d.ts
 *.tsbuildinfo
+eval/last_run.json

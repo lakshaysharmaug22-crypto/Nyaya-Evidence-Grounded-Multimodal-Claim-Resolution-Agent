@@ -8,6 +8,7 @@ its quotes are checked against the sources, and any model or parsing failure fal
 deterministic brief so a case is never blocked by the LLM.
 """
 import os
+import time
 from typing import Literal
 
 from langchain_core.prompts import ChatPromptTemplate
@@ -56,6 +57,13 @@ IN_PER_1K = float(os.getenv("LLM_INR_PER_1K_IN", "0.09"))
 OUT_PER_1K = float(os.getenv("LLM_INR_PER_1K_OUT", "0.45"))
 
 
+def model_info() -> dict:
+    """Provider/model actually configured, for eval reports and /ready."""
+    if os.getenv("ANTHROPIC_API_KEY"):
+        return {"provider": "anthropic", "model": os.getenv("LLM_MODEL", "claude-haiku-4-5-20251001")}
+    return {"provider": None, "model": None}
+
+
 def get_llm():
     """Structured-output runnable for the configured provider, or None when no key is set."""
     if os.getenv("ANTHROPIC_API_KEY"):
@@ -94,6 +102,12 @@ class Reader:
         self.chain = PROMPT | llm
 
     def read(self, sources: dict[str, str], decision: dict, attempts: int = 2) -> dict:
+        t0 = time.perf_counter()
+        out = self._read(sources, decision, attempts)
+        out["latency_ms"] = round((time.perf_counter() - t0) * 1000, 1)
+        return out
+
+    def _read(self, sources: dict[str, str], decision: dict, attempts: int) -> dict:
         last = None
         for _ in range(attempts):
             try:
