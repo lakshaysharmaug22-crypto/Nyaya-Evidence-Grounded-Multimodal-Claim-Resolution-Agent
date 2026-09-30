@@ -12,6 +12,14 @@ import { DemoBar, useDemo } from "@/components/DemoBar";
 const post = (path: string, body?: unknown) =>
   API ? agentFetch(path, { method: "POST", body: body ? JSON.stringify(body) : undefined }).catch(() => null) : Promise.resolve(null);
 
+const REPLY_STATUS: Record<string, string> = {
+  sent: "Delivered.",
+  dry_run: "Recorded, not sent: the API is in dry-run mode.",
+  destination_not_allowed: "Recorded, not sent: destination is not on the allowlist.",
+  failed: "Delivery failed. Nothing was sent; try again.",
+  demo: "Demo mode: no API connected.",
+};
+
 function downloadCsv(id: string, f: Final) {
   const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
   const rows = [["id", "decision", "rule", "lane", "ms", "verified", "trace"],
@@ -97,7 +105,8 @@ export default function Console() {
   const [reason, setReason] = useState("");
   const [rejecting, setRejecting] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
-  const [sent, setSent] = useState<Record<string, boolean>>({});
+  const [sent, setSent] = useState<Record<string, string>>({});
+  const [replyTo, setReplyTo] = useState<Record<string, string>>({});
   const [analysing, setAnalysing] = useState(false);
   const [opened, setOpened] = useState<string | null>(null);
   const [stuck, setStuck] = useState<{ id: string }[]>([]);
@@ -149,8 +158,12 @@ export default function Console() {
     setReviewed((r) => ({ ...r, ...Object.fromEntries(ready.map((q) => [q.id, "approved (batch)"])) }));
   };
   const sendReply = async () => {
-    await post("/replies", { id: sel.id, text: drafts[sel.id] });
-    setSent((s) => ({ ...s, [sel.id]: true }));
+    // Clicking Send is the agent's approval of this exact text. The API still refuses non-allowlisted
+    // destinations and sends nothing while REPLY_MODE is dry_run.
+    const r = await post("/replies", { id: sel.id, text: drafts[sel.id], to: replyTo[sel.id] || undefined,
+                                       approved: true, reply_id: `${sel.id}:${(drafts[sel.id] ?? "").length}` });
+    const j = r && r.ok ? await r.json().catch(() => null) : null;
+    setSent((s) => ({ ...s, [sel.id]: j?.status ?? (API ? "failed" : "demo") }));
   };
 
   useEffect(() => {
@@ -215,8 +228,12 @@ export default function Console() {
               {reviewed[sel.id] && <p className="muted" style={{ color: "#2ee6a6" }}>Recorded: {reviewed[sel.id]}</p>}
               <div className="muted" style={{ marginTop: 14 }}>Reply to customer (editable)</div>
               <textarea value={drafts[sel.id] ?? ""} onChange={(e) => setDrafts((d) => ({ ...d, [sel.id]: e.target.value }))} />
-              <button className="btn go" style={{ marginTop: 8 }} disabled={sent[sel.id]} onClick={sendReply}>{sent[sel.id] ? "Logged" : "Send reply"}</button>
-              {sent[sel.id] && <span className="muted"> Logged only. Email/WhatsApp delivery is not connected yet.</span>}
+              <input value={replyTo[sel.id] ?? ""} onChange={(e) => setReplyTo((t) => ({ ...t, [sel.id]: e.target.value }))}
+                placeholder="Customer email or phone (must be allowlisted)" aria-label="Reply destination"
+                style={{ width: "100%", marginTop: 8, padding: 10, borderRadius: 12, border: "1px solid rgba(255,255,255,.2)", background: "rgba(0,0,0,.25)", color: "inherit" }} />
+              <button className="btn go" style={{ marginTop: 8 }} disabled={sent[sel.id] === "sent"} onClick={sendReply}>
+                {sent[sel.id] === "sent" ? "Sent" : "Approve and send"}</button>
+              {sent[sel.id] && <span className="muted"> {REPLY_STATUS[sent[sel.id]] ?? sent[sel.id]}</span>}
             </Glass>
           )}
         </Glass>
