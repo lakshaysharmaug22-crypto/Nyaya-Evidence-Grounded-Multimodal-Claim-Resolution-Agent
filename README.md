@@ -6,11 +6,13 @@ LangGraph · FastAPI · Next.js · CNN · policy engine · grounded LLM · durab
 
 <p align="center"><b>Live app: <a href="https://nyaya-evidence-grounded-multimodal.vercel.app">nyaya-evidence-grounded-multimodal.vercel.app</a></b> · <a href="https://nyaya-evidence-grounded-multimodal.vercel.app/console">Console</a> · <a href="docs/ARCHITECTURE.md">Architecture</a> · <a href="eval/gold/README.md">Gold-set protocol</a> · <a href="ml/README.md">ML</a></p>
 
+<p align="center"><img src="docs/demo.gif" alt="Nyaya demo: a customer claim resolved live, the agent console, search and insights" width="880"></p>
+
 Nyaya resolves customer damage claims from four kinds of evidence: the photo, the invoice, the order record and the customer's own words. The checks run in parallel. A deterministic policy engine makes the decision, and a language model only writes a brief for the cases a human must review. Every quote in that brief is checked verbatim against the evidence. Refunds are idempotent and survive crashes, and every merge runs the eval harness in CI.
 
 ## Status
 
-The live site calls the real API on Render. The first request after idle can take about 50 s while the free instance wakes. The agent console needs the `AGENT_TOKEN` shown in Render → nyaya-api → Environment.
+The live site calls the real API on Render. The first request after idle can take about 50 s while the free instance wakes. On `/console` and `/insights`, choose **Explore with sample data** to look around without a token (nothing reaches the API), or enter the `AGENT_TOKEN` from Render → nyaya-api → Environment for live data.
 
 
 | Area | State |
