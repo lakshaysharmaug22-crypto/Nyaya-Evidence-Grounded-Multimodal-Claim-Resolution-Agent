@@ -10,7 +10,7 @@ Nyaya resolves customer damage claims from four kinds of evidence: the photo, th
 
 ## Status
 
-The live site runs the UI on its built-in demo stream until the API is deployed and `NEXT_PUBLIC_API_URL` is set.
+The live site calls the real API on Render. The first request after idle can take about 50 s while the free instance wakes. The agent console needs the `AGENT_TOKEN` shown in Render → nyaya-api → Environment.
 
 
 | Area | State |
@@ -23,7 +23,8 @@ The live site runs the UI on its built-in demo stream until the API is deployed 
 | Damage CNN | Training pipeline verified by a CPU smoke run; **not yet trained on real photos**. Photos score 0.0 and go to human review until it is |
 | Live LLM briefs | Integration tested with a stub; **no live model run yet** (needs `ANTHROPIC_API_KEY`) |
 | Human-verified gold set | Tooling and protocol ready; **0 cases labelled** |
-| Web app on Vercel | Live at https://nyaya-evidence-grounded-multimodal.vercel.app (demo stream; the API is not deployed yet) |
+| Web app on Vercel | Live at https://nyaya-evidence-grounded-multimodal.vercel.app, connected to the API |
+| API on Render | Live at https://nyaya-api-i7wt.onrender.com (`/ready`), production mode, token-gated agent endpoints; free plan sleeps when idle and resets data on redeploy |
 
 ## Architecture
 

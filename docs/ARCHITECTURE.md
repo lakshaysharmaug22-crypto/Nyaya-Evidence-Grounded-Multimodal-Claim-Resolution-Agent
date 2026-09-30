@@ -86,4 +86,4 @@ flowchart TD
 - Evaluation cases and tabular training data are synthetic. The metrics in the README are not real-world quality estimates.
 - The optional Whisper model has not been evaluated on real Hindi, English, or Hinglish recordings.
 - The CNN has no trained production weights (the pipeline is verified; see `ml/README.md`). Reply delivery is implemented but dry-run by default and untested against a live provider. Per-user roles, object storage, and distributed (multi-instance) rate limits are not implemented; the rate limiter and idempotency store are per-process/per-disk.
-- The web app is live at https://nyaya-evidence-grounded-multimodal.vercel.app on the demo stream; the API is not deployed yet.
+- Live: web https://nyaya-evidence-grounded-multimodal.vercel.app, API https://nyaya-api-i7wt.onrender.com (Render free plan: sleeps when idle, SQLite data resets on redeploy, tools are mocks).
