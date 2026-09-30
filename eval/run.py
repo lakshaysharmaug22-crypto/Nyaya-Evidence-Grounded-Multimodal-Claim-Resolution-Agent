@@ -7,6 +7,7 @@ from pathlib import Path
 from agent import graph as G
 from agent import llm
 from agent.graph import build
+from eval.feedback_slice import summarize as feedback_slice
 
 ROOT = Path(__file__).parent
 GOLD = ROOT / "gold" / "cases.json"
@@ -21,12 +22,14 @@ def run() -> dict:
         G.set_reader(llm.Reader(model))
     graph = build()
     cases = json.loads(GOLD.read_text())
-    correct, verified, lat, briefs = 0, 0, [], []
+    correct, verified, lat, briefs, predictions, labels = 0, 0, [], [], [], []
     for c in cases:
         t = time.perf_counter()
         out = graph.invoke({"claim": c["claim"]})
         lat.append((time.perf_counter() - t) * 1000)
         correct += out["decision"]["decision"] == c["expected"]
+        predictions.append(out["decision"]["decision"])
+        labels.append(c["expected"])
         verified += bool(out["verified"])
         if out.get("brief"):
             briefs.append(out["brief"])
@@ -43,6 +46,7 @@ def run() -> dict:
         "llm_used_rate": round(sum(b["llm_used"] for b in briefs) / len(cases), 4),
         "avg_cost_inr": round(sum(b["cost_inr"] for b in briefs) / len(cases), 4),
         "groundedness": (round(sum(g) / len(g), 4) if (g := [b["groundedness"] for b in briefs if b.get("groundedness") is not None]) else None),
+        "feedback_slice": feedback_slice(predictions, labels),
     }
 
 

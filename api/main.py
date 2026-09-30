@@ -24,11 +24,12 @@ from fastapi.responses import PlainTextResponse, StreamingResponse
 from langgraph.checkpoint.sqlite import SqliteSaver
 from PIL import Image
 
-from agent import blobs, drift, history, llm, reply, tools
+from agent import blobs, drift, feedback, history, llm, reply, tools
 from agent import graph as G
 from agent.metrics import RunMetrics
 from ml import predict, voice
 from ml.quality_gate import check as quality_check
+from agent.guard import looks_like_injection
 
 from .store import Store
 
@@ -37,7 +38,7 @@ DATA.mkdir(parents=True, exist_ok=True)
 AGENT_TOKEN = os.getenv("AGENT_TOKEN")
 RATE_PER_MIN = int(os.getenv("RATE_LIMIT_PER_MIN", "30"))
 
-app = FastAPI(title="Support Resolution Agent")
+app = FastAPI(title="Nyaya: Evidence-Grounded Multimodal Claim Resolution Agent")
 ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "*").split(",")]
 app.add_middleware(CORSMiddleware, allow_origins=ORIGINS, allow_methods=["*"], allow_headers=["*"])
 
@@ -188,7 +189,15 @@ def photo_check(body: dict):
 
 @app.post("/voice/transcribe", dependencies=[Depends(rate_limit)])
 def transcribe(body: dict):
-    return voice.transcribe(body["audio_b64"])
+    audio_b64 = body.get("audio_b64")
+    if not isinstance(audio_b64, str) or not audio_b64:
+        raise HTTPException(400, "audio_b64 is required")
+    if len(audio_b64) > 14_000_000:
+        raise HTTPException(413, "audio is too large")
+    result = voice.transcribe(audio_b64)
+    if result.get("ok"):
+        result["injection_flagged"] = looks_like_injection(result["text"])
+    return result
 
 
 @app.post("/decisions", dependencies=[Depends(require_agent)])
@@ -218,6 +227,12 @@ def decide_batch(body: dict):
 @app.get("/overrides", dependencies=[Depends(require_agent)])
 def overrides():
     return [d for d in DECISIONS if d["action"] == "reject"]
+
+
+@app.get("/learning-queue", dependencies=[Depends(require_agent)])
+def learning_queue():
+    """Human-labeled disagreements for review before any model retraining."""
+    return feedback.learning_queue(RUNS, DECISIONS)
 
 
 @app.post("/handoff", dependencies=[Depends(rate_limit)])
@@ -321,7 +336,9 @@ def metrics():
     for r in RUNS:
         by[r["decision"]] = by.get(r["decision"], 0) + 1
     g = [r["groundedness"] for r in RUNS if r.get("groundedness") is not None]
-    return {"n": n, "auto_resolve_rate": round(sum(r["lane"] == "ready" for r in RUNS) / n, 3),
+    queue = feedback.learning_queue(RUNS, DECISIONS)
+    return {"n": n, "learning_queue": len(queue),
+            "auto_resolve_rate": round(sum(r["lane"] == "ready" for r in RUNS) / n, 3),
             "verified_rate": round(sum(r["verified"] for r in RUNS) / n, 3),
             "p95_ms": lat[int(0.95 * (n - 1))], "recovered": sum(r["recovered"] for r in RUNS), "decisions": by,
             "overrides": sum(d["action"] == "reject" for d in DECISIONS), "handoffs": len(HANDOFFS),

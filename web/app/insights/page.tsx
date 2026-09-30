@@ -38,6 +38,7 @@ const SAMPLE_CLUSTERS = [
 const fmt = (metric: string, v: number) => (metric.includes("p95") ? `${Math.round(v * 10) / 10} ms` : `${Math.round(v * 100)}%`);
 const CURRENT = { minConf: 0.9, maxAmt: 5000 };
 type M = { n: number; auto_resolve_rate?: number; verified_rate?: number; p95_ms?: number; recovered?: number; llm_routed_rate?: number; avg_cost_inr?: number; groundedness?: number | null };
+type Feedback = { id: string; text: string; model_decision: string; model_rule: string; label: string; label_reason: string };
 
 export default function Insights() {
   const cases = useMemo(() => sample(), []);
@@ -47,6 +48,7 @@ export default function Insights() {
   const [degraded, setDegraded] = useState(false);
   const [liveDrift, setLiveDrift] = useState<{ status: string; alerts: { metric: string; ref: number; now: number }[] } | null>(null);
   const [liveClusters, setLiveClusters] = useState<{ terms: string[]; count: number }[] | null>(null);
+  const [feedbackQueue, setFeedbackQueue] = useState<Feedback[] | null>(null);
 
   useEffect(() => {
     if (!API) return;
@@ -55,6 +57,7 @@ export default function Insights() {
       get("/metrics").then(setM).catch(() => setM(null));
       get("/drift").then(setLiveDrift).catch(() => setLiveDrift(null));
       get("/clusters").then(setLiveClusters).catch(() => setLiveClusters(null));
+      get("/learning-queue").then(setFeedbackQueue).catch(() => setFeedbackQueue(null));
     };
     load();
     window.addEventListener("agent-token-set", load);
@@ -114,6 +117,19 @@ export default function Insights() {
           ))}
         </Glass>
       </div>
+      <Glass style={{ marginBottom: 16 }}>
+        <h2>Human corrections {feedbackQueue ? `(${feedbackQueue.length})` : ""}</h2>
+        {feedbackQueue === null ? <p className="muted">Connect the API and agent token to load reviewed disagreements.</p>
+          : feedbackQueue.length === 0 ? <p className="muted">No human corrections are queued yet.</p>
+          : feedbackQueue.map((f, i) => (
+            <div key={`${f.id}-${i}`} style={{ borderTop: "1px solid rgba(255,255,255,.12)", padding: "10px 0" }}>
+              <b>{f.id}</b> · policy: {f.model_decision} ({f.model_rule}) → human label: <b>{f.label}</b>
+              <div className="muted" style={{ marginTop: 4 }}>{f.text}</div>
+              {f.label_reason && <div className="muted">Reason: {f.label_reason}</div>}
+            </div>
+          ))}
+        <p className="muted">These reviewed disagreements are candidate labels; inspect them before retraining.</p>
+      </Glass>
       <Glass solid>
         <h2>Policy simulator (replays {cases.length} sample cases)</h2>
         <label style={{ display: "block", marginBottom: 12 }}>Min damage confidence: <b>{minConf.toFixed(2)}</b>

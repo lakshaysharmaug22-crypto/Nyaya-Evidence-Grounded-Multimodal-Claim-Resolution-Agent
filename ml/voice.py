@@ -21,7 +21,10 @@ def _load():
 
 def transcribe(audio_b64: str) -> dict:
     try:
-        segments, info = _load().transcribe(io.BytesIO(base64.b64decode(audio_b64)), vad_filter=True)
+        audio = base64.b64decode(audio_b64, validate=True)
+        if not audio:
+            raise ValueError("empty audio")
+        segments, info = _load().transcribe(io.BytesIO(audio), vad_filter=True)
         text = " ".join(s.text.strip() for s in segments).strip()
         return {"ok": bool(text), "text": text, "language": info.language}
     except Exception as e:

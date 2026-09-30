@@ -7,6 +7,7 @@ os.environ.setdefault("RATE_LIMIT_PER_MIN", "100000")
 os.environ.pop("AGENT_TOKEN", None)
 os.environ.pop("ANTHROPIC_API_KEY", None)
 import base64, io
+import struct, wave
 import pytest
 from PIL import Image
 import numpy as np
@@ -39,6 +40,18 @@ def invoice_pdf_b64():
         c.save()
         return base64.b64encode(b.getvalue()).decode()
     return make
+
+
+@pytest.fixture
+def short_audio_b64():
+    """A small valid WAV fixture for exercising the transcription input path."""
+    b = io.BytesIO()
+    with wave.open(b, "wb") as audio:
+        audio.setnchannels(1)
+        audio.setsampwidth(2)
+        audio.setframerate(16000)
+        audio.writeframes(struct.pack("<1600h", *([0] * 1600)))
+    return base64.b64encode(b.getvalue()).decode()
 
 
 @pytest.fixture(scope="session", autouse=True)
