@@ -49,10 +49,16 @@ class _JsonFormatter(logging.Formatter):
         return json.dumps(base | getattr(r, "extra", {}))
 
 
+class _PlainFormatter(logging.Formatter):
+    def format(self, r):
+        kv = " ".join(f"{k}={v}" for k, v in getattr(r, "extra", {}).items())
+        return f"{r.levelname} {r.getMessage()} {kv}".rstrip()
+
+
 log = logging.getLogger("nyaya")
 if not log.handlers:
     _h = logging.StreamHandler()
-    _h.setFormatter(_JsonFormatter() if CFG.log_json else logging.Formatter("%(levelname)s %(message)s"))
+    _h.setFormatter(_JsonFormatter() if CFG.log_json else _PlainFormatter())
     log.addHandler(_h)
     log.setLevel(os.getenv("LOG_LEVEL", "INFO").upper())
     log.propagate = False
