@@ -1,17 +1,28 @@
 # ML
 
-Colab or Kaggle GPU:
+## Damage CNN
+
+**Status: pipeline verified, model not yet trained on real photos.** The only run so far is a CPU smoke test on generated shapes (`python -m ml.train_cnn --smoke`); its numbers are meaningless and it writes to `artifacts/smoke/`, which inference never loads. Until a real model is trained, `damage_confidence` returns 0.0, so every photo claim goes to human review instead of being auto-approved.
+
+Train on Kaggle (free GPU): open `notebooks/train_damage_kaggle.ipynb`, attach a public damaged/intact photo dataset (e.g. *Damaged and Intact Packages*), set its licence, run all. Or anywhere with a GPU:
 
 ```
-pip install torch torchvision scikit-learn onnx onnxruntime pillow numpy
-python ml/train_cnn.py --data /path/to/data --epochs 8
+pip install torch torchvision onnx onnxruntime onnxscript
+python -m ml.train_cnn --data /path/to/dataset --epochs 8 \
+  --dataset-name "..." --dataset-url "..." --license "..."
 ```
 
-Data is an ImageFolder split: `train/{damaged,intact}` and `val/{damaged,intact}`. Use a public product or vehicle damage dataset, plus intact product photos, and hold out a validation set the model never sees.
+What the script does:
+- Finds the classes from folder names (`intact`/`undamaged`/`good` vs `damaged`/`broken`/`defect`) and drops exact-duplicate images so none leak across splits.
+- Uses the dataset's own train/val/test folders if it has them; otherwise it makes a seeded, stratified 70/15/15 split and saves it to `split.json`.
+- Fine-tunes ImageNet EfficientNet-B0: head only for 2 epochs, then the full network at lr/10. It keeps the best epoch by validation F1.
+- Reports accuracy, precision, recall, F1, ROC-AUC and the confusion matrix on the **held-out test split**, which is never used for training or model selection.
+- Exports ONNX, quantizes to INT8 and checks that the INT8 model agrees with PyTorch on the test set.
+- Writes `metrics.json` and `MODEL_CARD.md`: dataset and licence, counts, config, hardware, metrics, limitations.
 
-After training, copy `artifacts/damage.int8.onnx` back here. `infer.py` picks it up and the agent's photo node can call `damage_confidence`.
+Deploying the model without committing it: upload `damage.int8.onnx` as a GitHub release asset, then set `CNN_MODEL_URL` (the asset URL) and `CNN_MODEL_SHA256` (from `sha256sum`) on the API. It downloads the model on first use and refuses a file whose checksum does not match. Commit `MODEL_CARD.md` and `metrics.json` (they are not ignored) so the numbers in the README are traceable.
 
-`ImageFolder` sorts classes alphabetically, so `damaged` is index 0 and `intact` is index 1. That matches the default in `infer.py`.
+Inference (`infer.py`) uses the same preprocessing as validation: short side to 256, centre crop 224, ImageNet normalisation. Class index 0 is `damaged`.
 
 - `quality_gate.py` blur, brightness and size checks before upload
 - `dedupe.py` perceptual-hash duplicate detection

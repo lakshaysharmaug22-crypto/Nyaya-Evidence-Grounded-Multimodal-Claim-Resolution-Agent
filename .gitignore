@@ -13,6 +13,9 @@ node_modules/
 *.pt
 eval/last_run.json
 *.joblib
-ml/artifacts/
+ml/artifacts/*
+!ml/artifacts/MODEL_CARD.md
+!ml/artifacts/metrics.json
 data/
 web/next-env.d.ts
+*.tsbuildinfo
