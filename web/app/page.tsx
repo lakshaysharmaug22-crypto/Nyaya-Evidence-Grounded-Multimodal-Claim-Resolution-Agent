@@ -32,6 +32,7 @@ export default function Customer() {
   const [handoff, setHandoff] = useState("");
   const [rec, setRec] = useState<MediaRecorder | null>(null);
   const [voiceMsg, setVoiceMsg] = useState("");
+  const [voiceInjection, setVoiceInjection] = useState(false);
 
   const talkToHuman = async () => {
     if (!API) { setHandoff("Queued (demo mode). A person will pick this up with your full case."); return; }
@@ -53,7 +54,7 @@ export default function Customer() {
         const b64 = await toB64(new File([new Blob(chunks)], "note.webm"));
         const r = await fetch(`${API}/voice/transcribe`, { method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ audio_b64: b64 }) }).then((x) => x.json()).catch(() => ({ ok: false }));
-        if (r.ok) { setText((t) => (t ? t + " " : "") + r.text); setVoiceMsg(`Heard (${r.language}). Edit if needed.`); }
+        if (r.ok) { setText((t) => (t ? t + " " : "") + r.text); setVoiceInjection(Boolean(r.injection_flagged)); setVoiceMsg(`Transcript added (${r.language}). Review and edit it before submitting.`); }
         else setVoiceMsg("Could not transcribe. Please type instead.");
       };
       mr.start(); setRec(mr); setVoiceMsg("Recording... tap again to stop.");
@@ -87,6 +88,9 @@ export default function Customer() {
           {API && <button className="pill" style={{ background: rec ? "rgba(255,80,90,.3)" : "transparent", color: "inherit", cursor: "pointer", marginRight: 8 }}
             onClick={toggleVoice}>{rec ? "Stop recording" : "Voice note"}</button>}
           {voiceMsg && <div className="muted" style={{ margin: "6px 0" }}>{voiceMsg}</div>}
+          {voiceInjection && <div role="status" className="muted" style={{ color: "#ffb454", margin: "6px 0" }}>
+            This transcript contains instruction-like text. It will be treated as untrusted customer input and routed for review.
+          </div>}
           <label className="pill" style={{ display: "inline-block", cursor: "pointer" }}>
             Add photo
             <input type="file" accept="image/*" hidden onChange={(e) => onFile(e.target.files?.[0])} />
