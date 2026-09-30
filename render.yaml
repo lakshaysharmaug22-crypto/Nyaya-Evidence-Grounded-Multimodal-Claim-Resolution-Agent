@@ -1,15 +1,26 @@
+# Nyaya API on Render (Docker). The free plan has no persistent disk: SQLite data (runs, checkpoints,
+# idempotency keys) lives in the container and resets on each deploy or restart. Attach a disk and
+# point DATA_DIR at it on a paid plan for real durability.
 services:
   - type: web
-    name: support-resolution-api
+    name: nyaya-api
     runtime: docker
     plan: free
-    healthCheckPath: /health
+    healthCheckPath: /ready
     envVars:
-      - key: ALLOWED_ORIGINS
+      - key: NYAYA_ENV
+        value: production
+      - key: ALLOWED_ORIGINS          # your Vercel URL, e.g. https://nyaya.vercel.app
         sync: false
-      - key: AGENT_TOKEN
+      - key: AGENT_TOKEN              # 16+ chars; agents type it into the console once
+        generateValue: true
+      - key: ALLOW_SCORE_OVERRIDES    # demo only: lets the sample scenarios supply scores. Tools are mocks; set 0 before real refunds
+        value: "1"
+      - key: REPLY_MODE               # dry_run | webhook | smtp
+        value: dry_run
+      - key: ANTHROPIC_API_KEY        # optional; without it review cases get the deterministic brief
         sync: false
-      - key: ANTHROPIC_API_KEY
+      - key: CNN_MODEL_URL            # optional; GitHub release asset of damage.int8.onnx
         sync: false
-      - key: DATA_DIR
-        value: /var/data
+      - key: CNN_MODEL_SHA256
+        sync: false
