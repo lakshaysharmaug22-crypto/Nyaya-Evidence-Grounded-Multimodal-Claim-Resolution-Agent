@@ -11,36 +11,83 @@ import csv
 import hmac
 import io
 import json
+import logging
 import os
 import sqlite3
 import sys
 import time
+import uuid
 from collections import defaultdict, deque
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import PlainTextResponse, StreamingResponse
+from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
 from langgraph.checkpoint.sqlite import SqliteSaver
 from PIL import Image
 
-from agent import blobs, drift, feedback, history, llm, reply, tools
+from agent import blobs, delivery, drift, feedback, history, llm, reply, tools
 from agent import graph as G
 from agent.metrics import RunMetrics
 from ml import predict, voice
 from ml.quality_gate import check as quality_check
 from agent.guard import looks_like_injection
 
+from . import config, validate
 from .store import Store
 
-DATA = Path(os.getenv("DATA_DIR", "data"))
+CFG = config.load()                                # fails fast on unsafe production settings
+DATA = CFG.data_dir
 DATA.mkdir(parents=True, exist_ok=True)
-AGENT_TOKEN = os.getenv("AGENT_TOKEN")
-RATE_PER_MIN = int(os.getenv("RATE_LIMIT_PER_MIN", "30"))
+AGENT_TOKEN = CFG.agent_token
+RATE_PER_MIN = CFG.rate_per_min
 
-app = FastAPI(title="Nyaya: Evidence-Grounded Multimodal Claim Resolution Agent")
-ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "*").split(",")]
-app.add_middleware(CORSMiddleware, allow_origins=ORIGINS, allow_methods=["*"], allow_headers=["*"])
+
+class _JsonFormatter(logging.Formatter):
+    def format(self, r):
+        base = {"ts": round(r.created, 3), "level": r.levelname, "msg": r.getMessage()}
+        return json.dumps(base | getattr(r, "extra", {}))
+
+
+log = logging.getLogger("nyaya")
+if not log.handlers:
+    _h = logging.StreamHandler()
+    _h.setFormatter(_JsonFormatter() if CFG.log_json else logging.Formatter("%(levelname)s %(message)s"))
+    log.addHandler(_h)
+    log.setLevel(os.getenv("LOG_LEVEL", "INFO").upper())
+    log.propagate = False
+
+app = FastAPI(title="Nyaya: Evidence-Grounded Multimodal Claim Resolution Agent",
+              docs_url=None if CFG.production else "/docs", redoc_url=None)
+ORIGINS = CFG.origins
+app.add_middleware(CORSMiddleware, allow_origins=ORIGINS, allow_methods=["GET", "POST"],
+                   allow_headers=["Content-Type", "X-Agent-Token", "X-Request-Id"])
+MAX_BODY = CFG.max_body_mb * 1024 * 1024
+
+
+@app.middleware("http")
+async def _edge(request: Request, call_next):
+    """Request id, body-size cap, security headers and one access-log line per request (no bodies, no PII)."""
+    rid = request.headers.get("x-request-id") or uuid.uuid4().hex[:16]
+    rid = rid if validate.ID.match(rid) else uuid.uuid4().hex[:16]
+    size = request.headers.get("content-length")
+    if size and size.isdigit() and int(size) > MAX_BODY:
+        return JSONResponse({"detail": f"request larger than {CFG.max_body_mb} MB"}, 413, headers={"X-Request-Id": rid})
+    t0 = time.perf_counter()
+    request.state.rid = rid
+    resp = await call_next(request)
+    resp.headers.update({"X-Request-Id": rid, "X-Content-Type-Options": "nosniff", "X-Frame-Options": "DENY",
+                         "Referrer-Policy": "no-referrer", "Cache-Control": "no-store"})
+    log.info("request", extra={"extra": {"rid": rid, "method": request.method, "path": request.url.path,
+                                         "status": resp.status_code, "ms": round((time.perf_counter() - t0) * 1000, 1)}})
+    return resp
+
+
+@app.exception_handler(Exception)
+async def _unhandled(request: Request, exc: Exception):
+    rid = getattr(request.state, "rid", "-")
+    log.error("unhandled", extra={"extra": {"rid": rid, "path": request.url.path, "error": type(exc).__name__}})
+    return JSONResponse({"detail": "internal error", "request_id": rid}, 500)
 
 if os.getenv("USE_MCP") == "1":                    # route the agent's tools through the MCP server
     from agent import mcp_client
@@ -62,8 +109,12 @@ PARALLEL = ["photo", "invoice", "order", "classify"]
 SERIAL = ["fuse", "act", "verify"]
 
 
+def is_agent(token: str | None) -> bool:
+    return not AGENT_TOKEN or hmac.compare_digest(token or "", AGENT_TOKEN)
+
+
 def require_agent(x_agent_token: str | None = Header(default=None)):
-    if AGENT_TOKEN and not hmac.compare_digest(x_agent_token or "", AGENT_TOKEN):
+    if not is_agent(x_agent_token):
         raise HTTPException(401, "agent access required")
 
 
@@ -117,10 +168,25 @@ def health():
     return {"ok": True}
 
 
+@app.get("/ready")
+def ready():
+    """Readiness: storage is writable and the models this process relies on are loaded."""
+    try:
+        store.conn.execute("select 1")
+        _cp.conn.execute("select 1")
+    except sqlite3.Error:
+        raise HTTPException(503, "storage unavailable")
+    from ml.infer import MODEL
+    return {"ok": True, "env": CFG.env, "llm": _llm is not None, "cnn": MODEL.exists(),
+            "reply_mode": delivery.mode(), "auth": AGENT_TOKEN is not None}
+
+
 @app.post("/claims/stream", dependencies=[Depends(rate_limit)])
-async def stream(claim: dict):
-    claim = dict(claim)
-    cid = str(claim.setdefault("id", "anon"))
+async def stream(claim: dict, request: Request, x_agent_token: str | None = Header(default=None)):
+    trusted = CFG.allow_score_overrides or (AGENT_TOKEN is not None and is_agent(x_agent_token))
+    claim = validate.claim(claim, trusted=trusted)
+    cid = claim["id"]
+    rid = getattr(request.state, "rid", "-")
     for kind, key in (("image", "image_b64"), ("invoice", "invoice_b64")):     # keep big uploads out of graph state
         if claim.get(key):
             claim[f"{kind}_ref"] = blobs.put(cid, kind, claim.pop(key))
@@ -149,7 +215,9 @@ async def stream(claim: dict):
         try:
             out = await asyncio.to_thread(graph.invoke, {"claim": claim}, _cfg(cid))
         except Exception as e:                      # state up to the last finished step is saved
-            yield _sse({"error": f"{type(e).__name__}: {e}", "resumable": True, "id": cid})
+            log.error("run_failed", extra={"extra": {"rid": rid, "claim": cid, "error": type(e).__name__}})
+            msg = f"{type(e).__name__}: {e}" if trusted else "processing stopped; an agent can resume this claim"
+            yield _sse({"error": msg, "resumable": True, "id": cid, "request_id": rid})
             return
         yield _sse(_record(cid, claim, out, round((time.perf_counter() - t0) * 1000, 2)) | {"final_event": True})
     return StreamingResponse(gen(), media_type="text/event-stream")
@@ -183,7 +251,12 @@ async def resume(claim_id: str):
 
 @app.post("/photo/check", dependencies=[Depends(rate_limit)])
 def photo_check(body: dict):
-    img = Image.open(io.BytesIO(base64.b64decode(body["image_b64"])))
+    raw = validate.b64(body.get("image_b64"), "image_b64")
+    try:
+        img = Image.open(io.BytesIO(base64.b64decode(raw)))
+        img.load()
+    except Exception:
+        raise HTTPException(422, "image_b64 is not a readable image")
     return quality_check(img)
 
 
@@ -203,11 +276,13 @@ def transcribe(body: dict):
 @app.post("/decisions", dependencies=[Depends(require_agent)])
 def decide(body: dict):
     """Human approve/reject. Rejections require a reason; they feed the eval/override set."""
+    cid = validate.ident(body.get("id"), "id")
+    reason = validate.text(body.get("reason"), "reason", limit=1000)
     if body.get("action") not in ("approve", "reject"):
         raise HTTPException(400, "action must be approve or reject")
-    if body["action"] == "reject" and not str(body.get("reason", "")).strip():
+    if body["action"] == "reject" and not reason.strip():
         raise HTTPException(400, "reject needs a reason")
-    rec = {"id": body["id"], "action": body["action"], "reason": body.get("reason", ""), "ts": time.time()}
+    rec = {"id": cid, "action": body["action"], "reason": reason, "ts": time.time()}
     DECISIONS.append(rec)
     store.save("decision", rec)
     store.index("decision", f"{rec['id']}:{rec['ts']}", id=rec["id"], text=rec["reason"], decision=rec["action"], ts=rec["ts"])
@@ -216,7 +291,10 @@ def decide(body: dict):
 
 @app.post("/decisions/batch", dependencies=[Depends(require_agent)])
 def decide_batch(body: dict):
-    recs = [{"id": i, "action": "approve", "reason": "", "ts": time.time(), "batch": True} for i in body.get("ids", [])]
+    ids = body.get("ids", [])
+    if not isinstance(ids, list) or len(ids) > 200:
+        raise HTTPException(422, "ids must be a list of at most 200 claim ids")
+    recs = [{"id": validate.ident(i, "id"), "action": "approve", "reason": "", "ts": time.time(), "batch": True} for i in ids]
     for r in recs:
         DECISIONS.append(r)
         store.save("decision", r)
@@ -238,8 +316,10 @@ def learning_queue():
 @app.post("/handoff", dependencies=[Depends(rate_limit)])
 def handoff(body: dict):
     """Customer asks for a person. The full case (text, decision so far, trace) goes with it."""
-    run = next((r for r in reversed(RUNS) if r["id"] == body.get("id")), None)
-    rec = {"id": body.get("id"), "note": body.get("note", ""), "ts": time.time(), "case": run}
+    hid = validate.ident(body.get("id"), "id")
+    note = validate.text(body.get("note"), "note", limit=1000)
+    run = next((r for r in reversed(RUNS) if r["id"] == hid), None)
+    rec = {"id": hid, "note": note, "ts": time.time(), "case": run}
     HANDOFFS.append(rec)
     store.save("handoff", rec)
     store.index("handoff", f"{rec['id']}:{rec['ts']}", id=str(rec["id"]), order_id=(run or {}).get("order_id"),
@@ -254,8 +334,22 @@ def handoffs():
 
 @app.post("/replies", dependencies=[Depends(require_agent)])
 def send_reply(body: dict):
-    """Logs the reply the agent approved. Delivery (email / WhatsApp / SMS) is not wired up yet."""
-    rec = {"id": body["id"], "text": body["text"], "ts": time.time(), "delivered": False}
+    """Records the reply an agent approved and hands it to agent/delivery.py.
+
+    Nothing is sent unless `approved` is true, REPLY_MODE is a real channel and `to` is allowlisted.
+    `reply_id` makes retries safe: a reply that was already delivered is never sent again.
+    """
+    cid = validate.ident(body.get("id"), "id")
+    txt = validate.text(body.get("text"), "text", limit=2000, required=True)
+    to = body.get("to")
+    if to is not None and (not isinstance(to, str) or len(to) > 254):
+        raise HTTPException(422, "to must be an email address or phone number")
+    reply_id = validate.ident(body.get("reply_id"), "reply_id", required=False) or f"{cid}:{uuid.uuid4().hex[:8]}"
+    prior = next((r for r in REPLIES if r.get("reply_id") == reply_id and r.get("delivered")), None)
+    if prior:
+        return {**prior, "duplicate": True}
+    result = delivery.deliver(reply_id, cid, to, txt, approved=body.get("approved") is True)
+    rec = {"id": cid, "reply_id": reply_id, "text": txt, "to": to, "ts": time.time(), **result}
     REPLIES.append(rec)
     store.save("reply", rec)
     return rec
@@ -318,6 +412,8 @@ def _customer_status(run: dict, handed_off: bool) -> dict:
 @app.get("/track", dependencies=[Depends(rate_limit)])
 def track(claim_id: str, order_id: str):
     """Customer lookup. Needs BOTH the claim ID and the order ID, and never says which one was wrong."""
+    if len(claim_id) > 64 or len(order_id) > 64:
+        raise HTTPException(404, "We couldn't find a claim with those details.")
     run = next((r for r in reversed(RUNS) if r["id"].lower() == claim_id.strip().lower()
                 and (r.get("order_id") or "").lower() == order_id.strip().lower()), None)
     if not run:
