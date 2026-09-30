@@ -1,9 +1,12 @@
 .claude/
 CLAUDE.md
 __pycache__/
+.pytest_cache/
 *.pyc
 .venv/
+.deps/
 node_modules/
+.npm-cache/
 .next/
 .env
 *.onnx
