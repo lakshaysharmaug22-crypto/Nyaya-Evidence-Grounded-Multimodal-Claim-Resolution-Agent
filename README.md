@@ -1,4 +1,4 @@
-# Support Resolution Agent
+# Nyaya: Evidence-Grounded Multimodal Claim Resolution Agent
 
 Multimodal claim-resolution system: parallel evidence gathering, cross-modal fusion, a deterministic policy engine, idempotent tools, and an eval harness gated in CI.
 
@@ -12,6 +12,78 @@ python -m eval.run --gate            # eval vs baseline
 ```
 
 The UI runs on a local mock stream when `NEXT_PUBLIC_API_URL` is unset, so `web/` deploys to Vercel as-is.
+
+## Live console
+
+**Vercel deployment: pending.** The production URL will be added here after deployment and a live health check. The agent console will be available at `/console`; its demo walkthrough is `/console?demo=1`.
+
+## Architecture and flow
+
+Nyaya uses a Next.js customer/agent UI, a FastAPI streaming API, a LangGraph workflow, and SQLite-backed checkpoints, idempotency, and search. The photo, invoice, order, and text-classification checks run in parallel. A deterministic policy makes the approve/reject/escalate decision. The LLM can summarize review cases, but it cannot change the decision or refund amount.
+
+```mermaid
+flowchart LR
+    C[Customer or agent] --> W[Next.js web app]
+    W -->|REST and SSE| A[FastAPI]
+    A --> G[LangGraph claim workflow]
+    G --> P[Photo quality and duplicate check]
+    G --> I[Invoice extraction]
+    G --> O[Order lookup]
+    G --> T[Text classification]
+    P --> F[Evidence fusion]
+    I --> F
+    O --> F
+    T --> F
+    F --> D[Deterministic policy]
+    D -->|Ready| X[Idempotent refund and notification tools]
+    D -->|Review| L[Guarded advisory LLM]
+    L --> X
+    X --> V[Verification]
+    V --> A
+    G --> S[(SQLite checkpoints)]
+    A --> R[(SQLite events, FTS5, idempotency)]
+    A --> B[(DATA_DIR uploads)]
+```
+
+```mermaid
+flowchart TD
+    S[Submit claim and evidence] --> Q{Evidence gathering}
+    Q --> Q1[Photo quality and duplicate]
+    Q --> Q2[Invoice parse]
+    Q --> Q3[Order verification]
+    Q --> Q4[Text classification]
+    Q1 --> F[Cross-modal evidence fusion]
+    Q2 --> F
+    Q3 --> F
+    Q4 --> F
+    F --> P[Deterministic policy decision]
+    P -->|Clear approve| A[Issue idempotent refund]
+    P -->|Reject or mismatch| H[Hold for human review]
+    P -->|Review lane| G[Injection guard and grounded LLM brief]
+    G --> H
+    A --> V[Verify action]
+    H --> V
+    V --> E[Persist run and stream result]
+```
+
+For component responsibilities, data paths, and trust boundaries, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Evaluation results
+
+Latest local run (`python -m eval.run --gate`):
+
+| Measure | Result | Dataset / scope |
+| --- | ---: | --- |
+| Decision accuracy | 100% | 60 synthetic gold cases |
+| Verification rate | 100% | 60 synthetic gold cases |
+| Claim-type macro F1 | 1.000 | 1,500 synthetic test rows |
+| Refund MAE | ₹61.75 | 1,500 synthetic test rows; baseline ₹1,188.59 |
+| p95 workflow latency | 9.83 ms | Local Windows run; not a production SLO |
+| LLM used | 0% | No API key/model used in this run |
+| Full test suite | 91 passed | Local Windows run |
+| Web production build | Passed | Next.js build |
+
+All model and decision metrics above are from synthetic data. They are engineering checks, not estimates of real-world performance. No real claims, independently labeled gold set, or production traffic have been evaluated.
 
 ## Layout
 
@@ -32,6 +104,12 @@ The three tools (order lookup, refund, customer notification) are served by an M
 - Customer: human handoff carrying the full case, optional voice notes (`requirements-optional.txt`)
 - Insights: drift alerts, failure clusters with readable labels, policy simulator
 - Repeat-claimant check from claim history (3 prior claims in 30 days blocks auto-approve)
+
+## Human corrections and voice notes
+
+The Insights page shows the active-learning queue at `/learning-queue`: reviewed cases where an agent's approve/reject label differs from the policy result, with the claim text and rejection reason. These are candidate labels for human inspection before retraining; they never alter a policy decision. The eval output includes a `feedback_slice` count and label mix to show how many gold-set cases disagree with policy. Current evaluation data is synthetic, so this slice is not a real-world quality measure.
+
+Voice notes use the optional `faster-whisper` dependency and load the configured `WHISPER_MODEL` on first use. The customer form inserts the transcript into the claim text for review and flags instruction-like text through the same untrusted-text guard used by the policy graph. CI exercises the audio input path with a short WAV fixture and a mocked model; it does not verify transcription quality or download Whisper weights.
 
 Reply delivery (email / WhatsApp) is logged only and not connected yet.
 
@@ -63,4 +141,4 @@ Open `/console?demo=1` for the interviewer tools: inject a tool failure (order l
 
 ## Status
 
-Working: parallel agent graph, policy engine, retries, photo quality gate, duplicate check, tabular models, eval gate, glass UI. Pending: CNN weights, voice, real gold set. Eval numbers are on synthetic data until the gold set is replaced.
+Working: parallel agent graph, policy engine, retries, photo quality gate, duplicate check, tabular models, human-correction queue, eval gate, glass UI. Voice has an optional Whisper implementation but has not been quality-validated with real audio. Pending: CNN weights and a real gold set. Eval numbers are on synthetic data until the gold set is replaced.
