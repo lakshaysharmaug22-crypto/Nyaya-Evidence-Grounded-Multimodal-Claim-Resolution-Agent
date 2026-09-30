@@ -15,7 +15,7 @@ const PAR = ["photo", "invoice", "order", "classify"];
 const SER = ["fuse", "act", "verify"];
 
 /** Streams a claim run. Uses the API when NEXT_PUBLIC_API_URL is set, else a local mock (Vercel-friendly). */
-export function useClaimStream() {
+export function useClaimStream(api: string = API) {
   const [status, setStatus] = useState<Status>({});
   const [final, setFinal] = useState<Final | null>(null);
   const [busy, setBusy] = useState(false);
@@ -31,8 +31,8 @@ export function useClaimStream() {
     setStatus({}); setFinal(null); setLog([]); setError(null); setBusy(true);
     let result: Final | null = null;
     try {
-      if (API) {
-        const res = await fetch(`${API}/claims/stream`, {
+      if (api) {
+        const res = await fetch(`${api}/claims/stream`, {
           method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(claim),
         });
         const reader = res.body!.getReader(), dec = new TextDecoder();
@@ -68,6 +68,6 @@ export function useClaimStream() {
       }
     } finally { setBusy(false); }
     return result;
-  }, []);
+  }, [api]);
   return { status, final, busy, run, log, error };
 }

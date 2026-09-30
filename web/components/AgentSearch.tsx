@@ -2,8 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Glass } from "./Glass";
-import { API } from "@/lib/useClaimStream";
-import { agentFetch, openCase } from "@/lib/agent";
+import { agentFetch, openCase, useAgentApi } from "@/lib/agent";
 import { QUEUE } from "@/lib/queue";
 
 type Hit = { kind: string; id: string; order_id: string; decision: string; rule: string; claim_type: string; snippet: string };
@@ -40,13 +39,14 @@ export function AgentSearch() {
     window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h);
   }, [open]);
 
+  const api = useAgentApi();
   useEffect(() => {
     if (!open) return;
     const mine = ++seq.current;                              // ignore answers that arrive out of order
     setState("loading");
     const t = setTimeout(async () => {
       try {
-        if (!API) { setHits(localSearch(q)); setState("idle"); setIdx(0); return; }
+        if (!api) { setHits(localSearch(q)); setState("idle"); setIdx(0); return; }
         const res = await agentFetch(`/search?q=${encodeURIComponent(q)}`);
         if (!res.ok) throw new Error(String(res.status));
         const body = await res.json();
@@ -54,7 +54,7 @@ export function AgentSearch() {
       } catch { if (mine === seq.current) setState("error"); }
     }, 180);
     return () => clearTimeout(t);
-  }, [q, open]);
+  }, [q, open, api]);
 
   const choose = (h: Hit) => {
     setOpen(false);

@@ -4,20 +4,18 @@ import { Glass } from "@/components/Glass";
 import { FlowGraph } from "@/components/FlowGraph";
 import { BriefView } from "@/components/BriefView";
 import { AgentSearch } from "@/components/AgentSearch";
-import { API, Final, useClaimStream } from "@/lib/useClaimStream";
-import { agentFetch, downloadFromApi } from "@/lib/agent";
+import { Final, useClaimStream } from "@/lib/useClaimStream";
+import { agentFetch, downloadFromApi, useAgentApi } from "@/lib/agent";
 import { Item, QUEUE } from "@/lib/queue";
 import { DemoBar, useDemo } from "@/components/DemoBar";
 
-const post = (path: string, body?: unknown) =>
-  API ? agentFetch(path, { method: "POST", body: body ? JSON.stringify(body) : undefined }).catch(() => null) : Promise.resolve(null);
 
 const REPLY_STATUS: Record<string, string> = {
   sent: "Delivered.",
   dry_run: "Recorded, not sent: the API is in dry-run mode.",
   destination_not_allowed: "Recorded, not sent: destination is not on the allowlist.",
   failed: "Delivery failed. Nothing was sent; try again.",
-  demo: "Demo mode: no API connected.",
+  demo: "Sample mode: nothing was sent.",
 };
 
 function downloadCsv(id: string, f: Final) {
@@ -97,7 +95,10 @@ function CaseCard({ id, onClose }: { id: string; onClose: () => void }) {
 
 export default function Console() {
   const [sel, setSel] = useState(QUEUE[0]);
-  const { status, final, busy, run, log } = useClaimStream();
+  const api = useAgentApi();
+  const { status, final, busy, run, log } = useClaimStream(api);
+  const post = (path: string, body?: unknown) =>
+    api ? agentFetch(path, { method: "POST", body: body ? JSON.stringify(body) : undefined }).catch(() => null) : Promise.resolve(null);
   const demo = useDemo();
   const [inject, setInject] = useState(false);
   const [results, setResults] = useState<Record<string, Final>>({});
@@ -126,9 +127,9 @@ export default function Console() {
 
   // runs that stopped mid-way (crash / restart) and can be resumed
   const loadStuck = useCallback(async () => {
-    if (!API) return;
+    if (!api) { setStuck([]); return; }
     try { const r = await agentFetch("/recoverable"); if (r.ok) setStuck(await r.json()); } catch { /* offline */ }
-  }, []);
+  }, [api]);
   useEffect(() => { loadStuck(); window.addEventListener("agent-token-set", loadStuck); return () => window.removeEventListener("agent-token-set", loadStuck); }, [loadStuck]);
   const resume = async (id: string) => { await agentFetch(`/claims/${encodeURIComponent(id)}/resume`, { method: "POST" }); loadStuck(); setOpened(id); };
 
@@ -163,7 +164,7 @@ export default function Console() {
     const r = await post("/replies", { id: sel.id, text: drafts[sel.id], to: replyTo[sel.id] || undefined,
                                        approved: true, reply_id: `${sel.id}:${(drafts[sel.id] ?? "").length}` });
     const j = r && r.ok ? await r.json().catch(() => null) : null;
-    setSent((s) => ({ ...s, [sel.id]: j?.status ?? (API ? "failed" : "demo") }));
+    setSent((s) => ({ ...s, [sel.id]: j?.status ?? (api ? "failed" : "demo") }));
   };
 
   useEffect(() => {
@@ -221,7 +222,7 @@ export default function Console() {
                 <button className="btn go" onClick={approve}>Approve (A)</button>
                 <button className="btn no" onClick={reject}>{rejecting ? "Confirm reject" : "Reject (R)"}</button>
                 <button className="btn" style={{ background: "rgba(255,255,255,.14)" }}
-                  onClick={() => API ? downloadFromApi(`/audit/${sel.id}.csv`, `${sel.id}-audit.csv`) : downloadCsv(sel.id, res)}>Export CSV</button>
+                  onClick={() => api ? downloadFromApi(`/audit/${sel.id}.csv`, `${sel.id}-audit.csv`) : downloadCsv(sel.id, res)}>Export CSV</button>
               </div>
               {rejecting && <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason required (saved to the override set)"
                 style={{ marginTop: 10, width: "100%", padding: 10, borderRadius: 12, border: "1px solid rgba(255,255,255,.2)", background: "rgba(0,0,0,.25)", color: "inherit" }} />}

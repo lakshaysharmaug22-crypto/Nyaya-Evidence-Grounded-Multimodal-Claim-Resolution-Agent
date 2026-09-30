@@ -2,8 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Glass } from "@/components/Glass";
 
-import { API } from "@/lib/useClaimStream";
-import { agentFetch } from "@/lib/agent";
+import { agentFetch, useAgentApi } from "@/lib/agent";
 import { AgentSearch } from "@/components/AgentSearch";
 
 // Deterministic sample cases so the simulator is never empty. Replace with real logged cases.
@@ -50,8 +49,9 @@ export default function Insights() {
   const [liveClusters, setLiveClusters] = useState<{ terms: string[]; count: number }[] | null>(null);
   const [feedbackQueue, setFeedbackQueue] = useState<Feedback[] | null>(null);
 
+  const api = useAgentApi();
   useEffect(() => {
-    if (!API) return;
+    if (!api) { setM(null); setLiveDrift(null); setLiveClusters(null); setFeedbackQueue(null); return; }
     const load = () => {
       const get = (path: string) => agentFetch(path).then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.json(); });
       get("/metrics").then(setM).catch(() => setM(null));
@@ -62,7 +62,7 @@ export default function Insights() {
     load();
     window.addEventListener("agent-token-set", load);
     return () => window.removeEventListener("agent-token-set", load);
-  }, []);
+  }, [api]);
 
   const sim = (c: number, a: number) => {
     const auto = cases.filter((x) => x.conf >= c && x.amount <= a);
