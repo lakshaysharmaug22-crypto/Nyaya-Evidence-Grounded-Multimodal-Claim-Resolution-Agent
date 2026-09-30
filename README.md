@@ -4,11 +4,14 @@
 <p align="center"><b>Evidence-Grounded Multimodal Claim Resolution Agent</b><br>
 LangGraph · FastAPI · Next.js · CNN · policy engine · grounded LLM · durable resume</p>
 
-<p align="center"><b>Live app: pending first Vercel deployment</b> · <a href="docs/ARCHITECTURE.md">Architecture</a> · <a href="eval/gold/README.md">Gold-set protocol</a> · <a href="ml/README.md">ML</a></p>
+<p align="center"><b>Live app: <a href="https://nyaya-evidence-grounded-multimodal.vercel.app">nyaya-evidence-grounded-multimodal.vercel.app</a></b> · <a href="https://nyaya-evidence-grounded-multimodal.vercel.app/console">Console</a> · <a href="docs/ARCHITECTURE.md">Architecture</a> · <a href="eval/gold/README.md">Gold-set protocol</a> · <a href="ml/README.md">ML</a></p>
 
 Nyaya resolves customer damage claims from four kinds of evidence: the photo, the invoice, the order record and the customer's own words. The checks run in parallel. A deterministic policy engine makes the decision, and a language model only writes a brief for the cases a human must review. Every quote in that brief is checked verbatim against the evidence. Refunds are idempotent and survive crashes, and every merge runs the eval harness in CI.
 
 ## Status
+
+The live site runs the UI on its built-in demo stream until the API is deployed and `NEXT_PUBLIC_API_URL` is set.
+
 
 | Area | State |
 | --- | --- |
@@ -20,7 +23,7 @@ Nyaya resolves customer damage claims from four kinds of evidence: the photo, th
 | Damage CNN | Training pipeline verified by a CPU smoke run; **not yet trained on real photos**. Photos score 0.0 and go to human review until it is |
 | Live LLM briefs | Integration tested with a stub; **no live model run yet** (needs `ANTHROPIC_API_KEY`) |
 | Human-verified gold set | Tooling and protocol ready; **0 cases labelled** |
-| Web app on Vercel | Pending |
+| Web app on Vercel | Live at https://nyaya-evidence-grounded-multimodal.vercel.app (demo stream; the API is not deployed yet) |
 
 ## Architecture
 
