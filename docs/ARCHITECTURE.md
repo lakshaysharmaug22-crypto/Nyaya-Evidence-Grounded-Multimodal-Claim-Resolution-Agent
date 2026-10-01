@@ -81,9 +81,9 @@ flowchart TD
 - Outbound replies need agent approval, a non-dry-run `REPLY_MODE`, and an allowlisted destination; webhooks must be HTTPS and can be HMAC-signed.
 - `NYAYA_ENV=production` refuses to start without a 16+ character `AGENT_TOKEN` and explicit `ALLOWED_ORIGINS`, hides `/docs`, and logs JSON lines with request IDs and no request bodies.
 
-## Current operating limits
+## Known limitations
 
-- Evaluation cases and tabular training data are synthetic. The metrics in the README are not real-world quality estimates.
+- Evaluation cases and tabular training data are synthetic, so the README treats those numbers as regression checks, not accuracy.
 - The optional Whisper model has not been evaluated on real Hindi, English, or Hinglish recordings.
 - The CNN has no trained production weights (the pipeline is verified; see `ml/README.md`). Reply delivery is implemented but dry-run by default and untested against a live provider. Per-user roles, object storage, and distributed (multi-instance) rate limits are not implemented; the rate limiter and idempotency store are per-process/per-disk.
 - Live: web https://nyaya-evidence-grounded-multimodal.vercel.app, API https://nyaya-api-i7wt.onrender.com (Render free plan: sleeps when idle, SQLite data resets on redeploy, tools are mocks).

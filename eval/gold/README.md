@@ -5,7 +5,7 @@
 | Synthetic regression set | `cases.json` (from `eval/make_seed.py`) | 60 generated claims whose expected labels come from the same rules the policy implements | CI regression gate only. It is circular, so it cannot measure real accuracy |
 | Human-verified gold set | `verified/verified.jsonl` (built with `python -m eval.label`) | Real evidence, labelled independently by two people | Any accuracy number quoted outside the repo |
 
-**Status: the human-verified set is empty.** No human-labelled numbers exist yet, and the README reports none.
+Labelling is in progress; the main README quotes no accuracy numbers until this set is frozen.
 
 ## What counts as a gold case
 

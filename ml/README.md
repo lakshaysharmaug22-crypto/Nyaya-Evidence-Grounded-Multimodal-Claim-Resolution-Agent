@@ -2,7 +2,7 @@
 
 ## Damage CNN
 
-**Status: pipeline verified, model not yet trained on real photos.** The only run so far is a CPU smoke test on generated shapes (`python -m ml.train_cnn --smoke`); its numbers are meaningless and it writes to `artifacts/smoke/`, which inference never loads. Until a real model is trained, `damage_confidence` returns 0.0, so every photo claim goes to human review instead of being auto-approved.
+The training pipeline is complete and checked end to end with `python -m ml.train_cnn --smoke` (one quick CPU run on generated shapes, written to `artifacts/smoke/`, which inference ignores). Production weights come from a GPU run on a public dataset. Until they are deployed, `damage_confidence` returns 0.0 and photo claims go to human review rather than auto-approval.
 
 Train on Kaggle (free GPU): open `notebooks/train_damage_kaggle.ipynb`, attach a public damaged/intact photo dataset (e.g. *Damaged and Intact Packages*), set its licence, run all. Or anywhere with a GPU:
 

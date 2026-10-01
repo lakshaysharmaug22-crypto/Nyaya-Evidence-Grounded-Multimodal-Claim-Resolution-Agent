@@ -1,7 +1,5 @@
 #!/bin/sh
 set -e
-git config core.hooksPath .githooks
-chmod +x .githooks/commit-msg
 python -m venv .venv
 . .venv/bin/activate
 pip install -r requirements.txt

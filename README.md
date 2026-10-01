@@ -1,152 +1,119 @@
-<p align="center"><img src="web/public/nyaya-mark.svg" width="88" alt="Nyaya logo"></p>
+<p align="center"><img src="web/public/nyaya-mark.svg" width="80" alt="Nyaya"></p>
 
 <h1 align="center">Nyaya</h1>
-<p align="center"><b>Evidence-Grounded Multimodal Claim Resolution Agent</b><br>
-LangGraph · FastAPI · Next.js · CNN · policy engine · grounded LLM · durable resume</p>
+<p align="center">Evidence-grounded multimodal claim resolution agent</p>
 
-<p align="center"><a href="https://github.com/lakshaysharmaug22-crypto/Nyaya-Evidence-Grounded-Multimodal-Claim-Resolution-Agent/actions/workflows/eval.yml"><img src="https://github.com/lakshaysharmaug22-crypto/Nyaya-Evidence-Grounded-Multimodal-Claim-Resolution-Agent/actions/workflows/eval.yml/badge.svg?branch=main" alt="eval CI"></a> <a href="https://github.com/lakshaysharmaug22-crypto/Nyaya-Evidence-Grounded-Multimodal-Claim-Resolution-Agent/actions/workflows/authors.yml"><img src="https://github.com/lakshaysharmaug22-crypto/Nyaya-Evidence-Grounded-Multimodal-Claim-Resolution-Agent/actions/workflows/authors.yml/badge.svg?branch=main" alt="authors check"></a> <a href="https://nyaya-evidence-grounded-multimodal.vercel.app"><img src="https://img.shields.io/badge/live-vercel-000?logo=vercel" alt="Live on Vercel"></a></p>
+<p align="center">
+<a href="https://github.com/lakshaysharmaug22-crypto/Nyaya-Evidence-Grounded-Multimodal-Claim-Resolution-Agent/actions/workflows/eval.yml"><img src="https://github.com/lakshaysharmaug22-crypto/Nyaya-Evidence-Grounded-Multimodal-Claim-Resolution-Agent/actions/workflows/eval.yml/badge.svg?branch=main" alt="CI"></a>
+<a href="https://nyaya-evidence-grounded-multimodal.vercel.app"><img src="https://img.shields.io/badge/demo-live-2ea44f?logo=vercel" alt="Live demo"></a>
+<img src="https://img.shields.io/badge/python-3.11-3776AB?logo=python&logoColor=white" alt="Python 3.11">
+<img src="https://img.shields.io/badge/LangGraph-1.2-1C3C3C" alt="LangGraph">
+<img src="https://img.shields.io/badge/Next.js-14-000?logo=next.js" alt="Next.js 14">
+</p>
 
-<p align="center"><b>Live app: <a href="https://nyaya-evidence-grounded-multimodal.vercel.app">nyaya-evidence-grounded-multimodal.vercel.app</a></b> · <a href="https://nyaya-evidence-grounded-multimodal.vercel.app/console">Console</a> · <a href="docs/ARCHITECTURE.md">Architecture</a> · <a href="eval/gold/README.md">Gold-set protocol</a> · <a href="ml/README.md">ML</a></p>
+<p align="center">
+<a href="https://nyaya-evidence-grounded-multimodal.vercel.app"><b>Live demo</b></a> &nbsp;|&nbsp;
+<a href="https://nyaya-evidence-grounded-multimodal.vercel.app/console">Agent console</a> &nbsp;|&nbsp;
+<a href="docs/ARCHITECTURE.md">Architecture</a> &nbsp;|&nbsp;
+<a href="https://nyaya-api-i7wt.onrender.com/ready">API health</a>
+</p>
 
-<p align="center"><img src="docs/demo.gif" alt="Nyaya demo: a customer claim resolved live, the agent console, search and insights" width="880"></p>
+<p align="center"><img src="docs/demo.gif" alt="Claim submitted, resolved live, then reviewed in the agent console" width="860"></p>
 
-Nyaya resolves customer damage claims from four kinds of evidence: the photo, the invoice, the order record and the customer's own words. The checks run in parallel. A deterministic policy engine makes the decision, and a language model only writes a brief for the cases a human must review. Every quote in that brief is checked verbatim against the evidence. Refunds are idempotent and survive crashes, and every merge runs the eval harness in CI.
+E-commerce support teams spend most of their time on damage and refund claims, and most of those claims are either obviously valid or obviously not. Nyaya automates the obvious ones and hands the rest to a person with the evidence already laid out.
 
-## Status
+A claim arrives with a photo, an invoice, an order ID and a description. Four checks run in parallel (image quality and duplicates, invoice OCR, order lookup, text classification), a rule-based policy makes the call, and refunds go through idempotent tools that survive a crash mid-run. When a case needs a human, an LLM drafts a short brief for the reviewer, and every quote in it is checked against the source documents before it is shown.
 
-The live site calls the real API on Render. The first request after idle can take about 50 s while the free instance wakes. On `/console` and `/insights`, choose **Explore with sample data** to look around without a token (nothing reaches the API), or enter the `AGENT_TOKEN` from Render → nyaya-api → Environment for live data.
+> The demo API runs on Render's free tier, so the first request after a quiet spell takes about 50 s. On `/console`, pick **Explore with sample data** to try the agent tools without a login.
 
-
-| Area | State |
-| --- | --- |
-| Agent graph, policy engine, idempotent tools, crash-safe resume | Working, tested |
-| Photo quality gate, duplicate-photo check, invoice OCR, text classifier, refund regressor | Working, tested |
-| Console search, token-gated agent access, customer tracking, human handoff | Working; browser-tested locally |
-| Reply delivery (webhook / SMTP) | Implemented and tested with mocks; **dry-run by default, never used against a live provider** |
-| Production config: fail-fast settings, input validation, request IDs, security headers, JSON logs, `/ready` | Working, tested |
-| Damage CNN | Training pipeline verified by a CPU smoke run; **not yet trained on real photos**. Photos score 0.0 and go to human review until it is |
-| Live LLM briefs | Integration tested with a stub; **no live model run yet** (needs `ANTHROPIC_API_KEY`) |
-| Human-verified gold set | Tooling and protocol ready; **0 cases labelled** |
-| Web app on Vercel | Live at https://nyaya-evidence-grounded-multimodal.vercel.app, connected to the API |
-| API on Render | Live at https://nyaya-api-i7wt.onrender.com (`/ready`), production mode, token-gated agent endpoints; free plan sleeps when idle and resets data on redeploy |
-
-## Architecture
+## How it works
 
 ```mermaid
 flowchart LR
-    C[Customer or agent] --> W[Next.js web app]
-    W -->|REST and SSE| A[FastAPI]
-    A --> G[LangGraph claim workflow]
-    G --> P[Photo quality, duplicate check, CNN]
-    G --> I[Invoice extraction]
-    G --> O[Order lookup]
-    G --> T[Text classification]
-    P --> F[Evidence fusion]
-    I --> F
-    O --> F
-    T --> F
-    F --> D[Deterministic policy]
-    D -->|Ready| X[Idempotent refund and notification tools]
-    D -->|Review| L[Injection guard and grounded advisory LLM]
-    L --> X
-    X --> V[Verification]
-    V --> A
-    A --> R[Reply delivery: approval, allowlist, dry-run default]
-    G --> S[(SQLite checkpoints)]
-    A --> Q[(SQLite events, FTS5, idempotency)]
+    C[Customer] --> W[Next.js]
+    W -->|SSE| A[FastAPI]
+    A --> G{LangGraph}
+    G --> P[Photo: quality gate, pHash dedupe, CNN]
+    G --> I[Invoice: pypdf / Tesseract]
+    G --> O[Order lookup tool]
+    G --> T[Text: TF-IDF classifier]
+    P & I & O & T --> F[Evidence fusion]
+    F --> D[Policy engine]
+    D -->|clear| X[Refund + notify, idempotent]
+    D -->|needs review| L[LLM brief, quotes verified]
+    L --> H[Agent console]
+    X --> V[Verify]
+    G -.-> S[(SQLite checkpoints)]
 ```
 
-```mermaid
-flowchart TD
-    S[Submit claim and evidence] --> Q{Parallel evidence gathering}
-    Q --> Q1[Photo quality and duplicate]
-    Q --> Q2[Invoice parse]
-    Q --> Q3[Order verification]
-    Q --> Q4[Text classification]
-    Q1 --> F[Cross-modal fusion]
-    Q2 --> F
-    Q3 --> F
-    Q4 --> F
-    F --> P[Deterministic policy]
-    P -->|Clear approve| A[Issue idempotent refund]
-    P -->|Reject or conflict| H[Hold for human review]
-    P -->|Review lane| G[Grounded LLM brief, quotes verified]
-    G --> H
-    A --> V[Verify action]
-    H --> V
-    V --> E[Persist, stream result, draft reply]
-    E --> R{Agent approves reply?}
-    R -->|yes, allowlisted| D[Deliver via webhook or SMTP]
-    R -->|no or dry-run| L[Record only]
-```
+| Stage | What it does | Code |
+| --- | --- | --- |
+| Evidence | Photo, invoice, order and text checks fan out and run concurrently | `agent/graph.py` |
+| Fusion | Cross-checks modalities: text says "damaged" but the photo shows nothing, invoice total or order ID doesn't match | `agent/graph.py` |
+| Policy | 8 ordered rules: duplicate photo, unknown order, 7-day window, prompt injection, cross-modal mismatch, amount outlier, auto-approve, review | `agent/policy.py` |
+| Brief | Review cases only. Structured output via LangChain; findings whose quotes aren't in the evidence are dropped | `agent/llm.py`, `agent/guard.py` |
+| Action | Refund and notification through a tool registry with retries and persistent idempotency keys, also served over MCP | `agent/tools.py`, `mcp_servers/` |
 
-Components, data paths and trust boundaries: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+## Engineering decisions
 
-Design rules:
-- **Policy decides, the model advises.** Only review-lane cases reach the LLM. It cannot change a decision or an amount, and findings whose quotes aren't in the evidence are dropped.
-- **Customers can't score their own claims.** In production, model scores in a public request body are stripped. They come from the photo, invoice and order checks only.
-- **No double refunds.** Idempotency keys live in SQLite, and the graph resumes from its last checkpoint after a crash.
-- **Nothing is sent without approval.** A reply leaves only when an agent approves it, a real channel is configured and the destination is allowlisted.
+**The model advises, it never decides.** Refund decisions are money, so they come from rules that can be read, tested and audited. The LLM only summarises the evidence for a reviewer, and only on cases the rules route to review (about 60% of the regression set), which keeps cost down.
 
-## Results
+**Grounding is enforced, not prompted.** Every finding in the LLM brief has to carry a quote. `guard.is_grounded` checks that quote against the claim text and the OCR'd invoice, and anything that doesn't match is dropped before the reviewer sees it. Claim text is wrapped as untrusted input, and injection-style phrasing ("ignore previous instructions", "approve this") sends the claim straight to review.
 
-Each row says what data it came from. None of these figures are human-verified or real-world.
+**A crash can't refund twice.** The graph checkpoints to SQLite after every node, and tool calls carry idempotency keys stored in the same database. `tests/test_durability.py` simulates a crash right after the refund call, rebuilds the graph against the same database, resumes the run and asserts exactly one refund was issued.
 
-| Measure | Result | Data |
-| --- | ---: | --- |
-| Decision accuracy (policy) | 100% | 60 synthetic regression cases, whose labels come from the same rules, so the check is circular |
-| Verification rate | 100% | Same 60 synthetic cases |
-| Claim-type macro F1 | 1.000 | 1,500 synthetic test rows |
-| Refund MAE | ₹61.75 (baseline ₹1,188.59) | 1,500 synthetic test rows |
-| p95 workflow latency | ~5 ms | Local CPU run, policy only, no LLM or CNN; not a production SLO |
-| Tests | 117 passed | Local run |
-| Damage CNN | Not trained on real data yet | See [ml/README.md](ml/README.md) |
-| Live LLM (groundedness, cost, latency) | Not run yet | Reported by `python -m eval.run --set verified --llm` |
-| Human-verified accuracy | Not measured yet | Protocol: [eval/gold/README.md](eval/gold/README.md) |
+**Customers can't score their own claims.** The scoring fields the eval harness uses (`damage_conf` and friends) were briefly accepted from the public endpoint. A request with `damage_conf: 0.99` would have been auto-approved with no photo at all. In production those fields are now stripped from any request without an agent token (`api/validate.py`, covered in `tests/test_hardening.py`).
 
-## Run locally
+**Search is FTS5, not embeddings.** Agents search by claim ID, order ID and phrases like "screen cracked". Exact and prefix matches matter more than semantic similarity here, and SQLite FTS5 handles that with filters (`decision:reject rule:duplicate_image`) and no extra service to run.
 
-```
-sh scripts/bootstrap.sh                     # venv, deps, git hooks
-python -m ml.train_tabular                  # tabular models (synthetic data)
-uvicorn api.main:app --reload               # API on :8000
-cd web && NEXT_PUBLIC_API_URL=http://localhost:8000 npm run dev   # UI on :3000
-python -m pytest -q                         # needs tesseract-ocr
-python -m eval.run --gate                   # regression gate vs eval/baseline.json
-```
+## Stack
 
-Without `NEXT_PUBLIC_API_URL` the UI runs on a built-in demo stream, so `web/` works on Vercel by itself.
-
-Pages: `/` customer claim, voice note and tracking · `/console` agent queue, search (`/` or Ctrl/Cmd+K), briefs, reply approval · `/console?demo=1` failure injection and replay · `/insights` metrics, drift, clusters, policy simulator, human-correction queue.
-
-## Deploy
-
-1. **Web on Vercel:** import this repo, set **Root Directory** to `web`, and deploy. Add `NEXT_PUBLIC_API_URL` once the API is up, then redeploy.
-2. **API on Render:** New, then Blueprint, pointing at this repo (`render.yaml`). It runs with `NYAYA_ENV=production`, which refuses to start without `ALLOWED_ORIGINS` (your Vercel URL) and an `AGENT_TOKEN` of 16+ characters (generated for you). On the free plan, data resets on every deploy. Attach a disk and set `DATA_DIR` for durability.
-3. **Optional:** `ANTHROPIC_API_KEY` for live briefs, `CNN_MODEL_URL` + `CNN_MODEL_SHA256` for the trained CNN, and `REPLY_MODE` + `REPLY_ALLOWLIST` + channel settings for delivery. Set all of them in the provider's secret settings, never in the repo.
-
-Every variable is documented in [.env.example](.env.example).
+| | |
+| --- | --- |
+| Agent | LangGraph (parallel fan-out, conditional routing, SQLite checkpointer), LangChain structured output, MCP server and client |
+| ML | EfficientNet-B0 fine-tune exported to INT8 ONNX, TF-IDF + logistic regression, gradient boosting regressor, KMeans, perceptual hashing, Tesseract OCR, faster-whisper (optional) |
+| Backend | FastAPI with server-sent events, SQLite (checkpoints, idempotency, FTS5 search) |
+| Frontend | Next.js 14, live animated flow graph, glass UI that samples its tint from the background |
+| Ops | Docker, Render, Vercel, GitHub Actions (tests, eval gate, ablation and web build on every merge) |
 
 ## Evaluation
 
-- `python -m eval.run --gate`: synthetic regression set. CI fails the merge on accuracy, verification or latency regressions.
-- `python -m eval.run --set verified [--llm]`: human-verified gold set, reported by dev/test split, plus LLM provider, model, calls, errors, p50/p95 latency, tokens and cost.
-- `python -m eval.label ...`: build that set. Two blind annotators, Cohen's kappa, adjudication, and a customer-grouped split. See [eval/gold/README.md](eval/gold/README.md).
-- `python -m eval.ablation`: what each evidence source contributes.
+```
+python -m eval.run --gate     # CI regression gate against eval/baseline.json
+python -m eval.ablation       # contribution of each evidence source
+```
 
-## ML
+The regression set is 60 generated claims covering every policy path. The policy passes all of them, and CI blocks any merge that drops accuracy or verification rate or pushes p95 latency past the baseline. Since those labels come from the same rules as the policy, this is a regression test rather than an accuracy claim. The tabular models are trained and scored on synthetic claims for the same reason.
 
-- **Damage CNN:** EfficientNet-B0 fine-tune with a seeded, grouped split, held-out test metrics, INT8 ONNX export with a parity check, and a generated model card. Train it with `ml/notebooks/train_damage_kaggle.ipynb` on a free Kaggle GPU.
-- **Tabular models:** TF-IDF + logistic regression claim type, gradient-boosting refund estimate, KMeans failure clusters. Trained on synthetic claims.
-- **Image checks:** blur, brightness and size gate before upload, perceptual-hash duplicate detection.
-- **Invoice extraction:** pypdf for PDFs and Tesseract for images.
-- **Voice:** optional faster-whisper. Transcripts go through the same injection guard as typed text.
+Real accuracy needs labelled data, so `eval/label.py` builds a gold set the proper way: two annotators label each case without seeing the system's output, Cohen's kappa is reported, disagreements are adjudicated with a written note, and the split is grouped by customer so nobody appears in both dev and test. The protocol is in [eval/gold/README.md](eval/gold/README.md). `python -m eval.run --set verified --llm` then reports accuracy per split along with LLM groundedness, tokens, cost and p50/p95 latency.
 
-## Reply delivery
+## Production hardening
 
-`POST /replies` with `approved: true` is the agent's sign-off on that exact text. Nothing is sent unless `REPLY_MODE` is `webhook` (HTTPS POST, optional HMAC signature, e.g. to n8n or a WhatsApp/SMS bridge) or `smtp`, and the destination matches `REPLY_ALLOWLIST`. A retry with the same `reply_id` never sends twice. The console shows exactly what happened: sent, dry-run, not allowlisted or failed.
+- `NYAYA_ENV=production` refuses to start without a 16+ character agent token and an explicit CORS origin, and hides `/docs`
+- Agent endpoints are token-gated with a constant-time compare; public endpoints are rate limited per IP
+- Request bodies are size-capped and validated (IDs, text length, numeric ranges, base64)
+- JSON logs carry request IDs and never request bodies; security headers are set on every response, and `/ready` reports component health
+- Replies go out only after an agent approves the exact text, a real channel is configured and the recipient is on an allowlist. A retried send never goes out twice
+- The trained CNN loads from a release URL and is rejected if its SHA-256 doesn't match, so no model binary sits in the repo
+- 117 tests cover the graph, policy, durability, LLM guardrails, search and access control, hardening and the gold-set tooling
 
-## Repository rules
+## Run it
 
-- Commits carry only the author's name. `.githooks/commit-msg` blocks AI attribution, and the `authors` workflow checks every PR and every push to `main`.
-- Every merge runs the tests, the eval gate, the ablation and the web build (`.github/workflows/eval.yml`).
+```bash
+sh scripts/bootstrap.sh            # venv and dependencies
+python -m ml.train_tabular         # train the tabular models
+uvicorn api.main:app --reload      # API on :8000
+cd web && NEXT_PUBLIC_API_URL=http://localhost:8000 npm run dev    # UI on :3000
+python -m pytest -q                # needs tesseract-ocr
+```
+
+Without `NEXT_PUBLIC_API_URL` the UI falls back to a built-in demo stream. Every setting is documented in [.env.example](.env.example).
+
+Deploying: `render.yaml` is a Render Blueprint for the API (Docker, production mode, generated agent token), and the `web/` folder deploys to Vercel as-is.
+
+## Roadmap
+
+- Train the damage CNN on a public damaged/intact product dataset (`ml/notebooks/train_damage_kaggle.ipynb`). The pipeline is done; until weights are deployed, photo claims route to review
+- Label about 100 real-evidence claims with the gold-set tooling and publish those numbers in place of the synthetic ones
+- Run the live LLM eval for groundedness and cost per claim
+- Move storage to Postgres and object storage for multi-instance deployments
